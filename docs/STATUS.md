@@ -9,9 +9,9 @@ Last updated: 2026-11-04. Read this first when resuming. Rules: `CLAUDE.md`. Dec
 | 00 basic setup (pinned submodules) | done | `logs/00-basic-setup.log` |
 | 01 host prerequisites check | done | `logs/01-check-prerequisites.log` |
 | 02 stock native-POSIX cFS baseline | done | `docs/test-results/02-native-baseline.md` |
-| 03 FreeRTOS POSIX smoke test (patch 0001, idle hook) | done; re-run 2026-11-04 after config changes: 10/10 PASS | `docs/test-results/03-freertos-posix-smoke.md` |
-| **04a OSAL FreeRTOS core layer + simulator BSP** | **in progress** (approved) | `scripts/04-build-osal-freertos-sim.sh`, `logs/04-*` |
-| 04b static RAM file system (D19) | not started; needs approval | — |
+| 03 FreeRTOS POSIX smoke test (patch 0001, idle hook) | done; re-run 2026-11-04 after config changes: 10/10 PASS; re-run on new host 2026-11-04: 10/10 PASS | `docs/test-results/03-freertos-posix-smoke.md` |
+| 04a OSAL FreeRTOS core layer + simulator BSP | done (closed 2026-11-04) | `docs/test-results/04a-osal-freertos-sim.md` |
+| **04b static RAM file system (D19)** | **next; not started, needs approval** | — |
 | 04c full OSAL functional test set | not started; needs approval | — |
 | PSP, cFE on the simulator, counter_app, SmartFusion2 target | not planned in detail yet | — |
 
@@ -36,18 +36,25 @@ Last full run (2026-11-03/04, 3 rounds): all 12 tests pass except
 - osal-core-test 02.003 — known simulator limitation, now tolerated by the script (D22);
 - **sem-speed-test hung once (round 3)**, about 1 in 35 runs overall; 25 later runs and 12 runs under gdb were clean.
 
+Re-run on the new host (2026-11-04, Docker, 2 vCPU Xeon Platinum 8370C, Ubuntu 24.04.5, gcc 13.3.0, cmake 3.28.3):
+steps 00–03 all exit 0 (03: 10/10 PASS); `ROUNDS=3 ./scripts/04-build-osal-freertos-sim.sh --clean` exit 0,
+36/36 runs passed (02.003 tolerated per D22), sem-speed-test clean in all 3 rounds. This is the first `--clean`
+run after the D22 change.
+
+sem-speed-test hang: **closed as a host artefact (D24)**. 200 untraced runs in a loop on the new host all passed;
+no code change. Reopen if it appears again.
+
 ### Next actions for 04a (approved: "investigate before closing")
-1. Find the sem-speed-test hang. Plan: a debug-build-only watchdog that, when a test stalls, prints scheduler
-   state (`xTickCount`, `uxSchedulerSuspended`, current task) and each semaphore's value and waiter list; run
-   sem-speed-test in a long loop. To attach gdb to a hung run without slowing it, use `tools/debug/ptrace-launch.c`
-   (ptrace_scope=1 on this host). Suspects: a race in `os-impl-sem.c`, or the POSIX port under ~170k switches/s.
-2. Re-run `./scripts/04-build-osal-freertos-sim.sh --clean` (ROUNDS=3 or more) until clean; not yet run after
-   the D22 change.
-3. Write `docs/test-results/04a-osal-freertos-sim.md`, `docs/ARCHITECTURE.md` (OSAL layering), README line.
-4. Ask for approval of 04b.
+1. ~~Find the sem-speed-test hang~~ — closed as a host artefact (D24).
+2. ~~Re-run script 04 with `--clean` after D22~~ — done 2026-11-04 on the new host: 36/36 passed.
+3. ~~Write the 04a result, architecture doc and README line~~ — done 2026-11-04: `docs/test-results/04a-osal-freertos-sim.md`,
+   `docs/ARCHITECTURE.md`, README updated.
+4. Ask for approval of 04b (next).
 
 ## Environment facts that matter
-- Host is a 2-vCPU VirtualBox VM: `usleep(1000)` ≈ 2.7 ms; busy threads can starve others for seconds
-  (D14, D15, D21). Suspect this first for any simulator hang or timing drift.
-- `kernel.yama.ptrace_scope=1`: gdb can only attach to its own children (see `tools/debug/`).
+- Current host (since 2026-11-04): Docker container, 2 vCPU Xeon Platinum 8370C, Ubuntu 24.04.5. No effective
+  capabilities: gdb cannot attach to a running process at all (`tools/debug/ptrace-launch.c` does not help here);
+  gdb can still run a program as its own child. Core dumps go to the host's apport pipe and are not reachable.
+- Previous host was a 2-vCPU VirtualBox VM: `usleep(1000)` ≈ 2.7 ms; busy threads could starve others for seconds
+  (D14, D15, D21). Suspect host starvation first for any simulator hang or timing drift.
 - Git: public repo https://github.com/coskuncelik/m2s-cfs, branch `main` (D23). Commit/push only with approval.
