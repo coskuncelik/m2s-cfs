@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 04-build-osal-freertos-sim.sh — build OSAL with the m2s-cfs FreeRTOS layer on the Linux
-# simulator and run OSAL's functional tests (steps 04a, 04b).
+# simulator and run OSAL's functional tests (steps 04a, 04b, 04c).
 #
 #   OS layer : osal-ext/freertos            (OSAL_SYSTEM_OSTYPE=freertos)
 #   BSP      : osal-ext/freertos-posix-sim  (OSAL_SYSTEM_BSPTYPE=freertos-posix-sim)
@@ -9,9 +9,10 @@
 #
 # Checks:
 #   0. RAM file system core test (tests/ramfs-core, host gcc with ASan/UBSan, no FreeRTOS);
-#   1. configure + build the OSAL library and the 04a tests (project code: -Wall -Wextra -Werror);
+#   1. configure + build the OSAL library and all tests below (project code: -Wall -Wextra -Werror);
 #   2. no FreeRTOS heap and no dynamic FreeRTOS object creation in any test binary;
-#   3. each test runs ROUNDS times; every run must exit 0 and report no FAIL/TSF/TTF;
+#   3. each test runs ROUNDS times; every run must exit 0 and report no FAIL/TSF/TTF, except the exact
+#      assertions listed in KNOWN_FAILS (each one backed by a decision in docs/DECISIONS.md);
 #   4. sources/cFS and sources/FreeRTOS-Kernel unchanged.
 #
 # Usage: ./scripts/04-build-osal-freertos-sim.sh [--clean]      (env: ROUNDS, default 3)
@@ -30,19 +31,44 @@ RUN_DIR="${LOG_DIR}/04-osal-tests"
 ROUNDS="${ROUNDS:-3}"
 RUN_TIMEOUT=90
 
+# Test programs, as paths relative to the build directory; the CMake target is the file name.
+#   tests/       OSAL example/functional tests (04a, 04b, 04c)
+#   unit-tests/  OSAL API-exhaustive functional tests (04c)
 TESTS=(
-    osal-core-test queue-test mutex-test
-    bin-sem-test bin-sem-timeout-test count-sem-test count-sem-timeout-test
-    idmap-api-test sem-speed-test
-    timer-test time-base-api-test timer-add-api-test
-    file-api-test file-sys-add-fixed-map-api-test
+    tests/osal-core-test tests/queue-test tests/mutex-test
+    tests/bin-sem-test tests/bin-sem-timeout-test tests/count-sem-test tests/count-sem-timeout-test
+    tests/idmap-api-test tests/sem-speed-test
+    tests/timer-test tests/time-base-api-test tests/timer-add-api-test
+    tests/file-api-test tests/file-sys-add-fixed-map-api-test
+    tests/condvar-test tests/select-test tests/shell-test tests/symbol-api-test tests/network-api-test
+    unit-tests/oscore-test/osal_core_UT unit-tests/osfile-test/osal_file_UT
+    unit-tests/osfilesys-test/osal_filesys_UT unit-tests/ostimer-test/osal_timer_UT
+    unit-tests/osloader-test/osal_loader_UT unit-tests/osnetwork-test/osal_network_UT
 )
 
-# Known simulator limitation (docs/DECISIONS.md D22): on the FreeRTOS POSIX port a task runs on a
-# host pthread stack, not on the stack buffer passed to OS_TaskCreate, so this single assertion
-# cannot pass on the simulator. Only this exact assertion is tolerated, only in this test.
-KNOWN_SIM_TEST="osal-core-test"
-KNOWN_SIM_ASSERT="osal-core-test.c:145 - cpuaddr: VarAddress"
+# Tolerated assertions, as "<test name>|<text that identifies one FAIL/TSF/TTF line>". A run passes
+# only if its failed assertions are exactly the entries listed for that test (same count, each one
+# matched), so a new failure or a missing expected one is still an error.
+#   D22: on the FreeRTOS POSIX port a task runs on a host pthread stack, not on the stack buffer
+#        passed to OS_TaskCreate, so this assertion cannot pass on the simulator.
+#   D26: features left out by configuration (osal_config.cmake): the network (network-api-test checks
+#        socket address functions without allowing "not implemented") and loading modules from
+#        files (osal_loader_UT loads /utmod/MODULE*.so; the dynamic loader is off).
+KNOWN_FAILS=(
+    "osal-core-test|osal-core-test.c:145 - cpuaddr: VarAddress"
+    "network-api-test|network-api-test.c:99 - OS_SocketAddrSetPort(&addr, 0xFFFF) (-28)"
+    "network-api-test|network-api-test.c:103 - OS_SocketAddrGetPort(&port, &addr) (-28)"
+    "network-api-test|network-api-test.c:108 - OS_SocketAddrInit(&addr, OS_SocketDomain_INET) (-28)"
+    "network-api-test|network-api-test.c:113 - OS_SocketAddrFromString(&addr, \"invalid\") (-28)"
+    "network-api-test|network-api-test.c:119 - OS_SocketAddrToString(addr_string, 1, &addr) (-28)"
+    "osal_loader_UT|ut_osloader_module_test.c:128 - OS_ModuleLoad(&module_id, module_name, module_file_name, OS_MODULE_FLAG_LOCAL_SYMBOLS) (-28)"
+    "osal_loader_UT|ut_osloader_module_test.c:141 - OS_ModuleLoad(&module_id2, \"DUPLICATE\", UT_OS_GENERIC_MODULE_NAME2, OS_MODULE_FLAG_LOCAL_SYMBOLS) (-28)"
+    "osal_loader_UT|ut_osloader_module_test.c:156 - OS_ModuleLoad(&module_id, \"Good\", UT_OS_GENERIC_MODULE_NAME2, OS_MODULE_FLAG_LOCAL_SYMBOLS) (-28)"
+    "osal_loader_UT|ut_osloader_module_test.c:159 - OS_ModuleUnload(module_id) (-16)"
+    "osal_loader_UT|ut_osloader_module_test.c:195 - OS_ModuleLoad(&module_id, \"Good\", UT_OS_GENERIC_MODULE_NAME2, OS_MODULE_FLAG_LOCAL_SYMBOLS) (-28)"
+    "osal_loader_UT|ut_osloader_module_test.c:232 - OS_ModuleLoad(&module_id, \"Good\", UT_OS_GENERIC_MODULE_NAME2, OS_MODULE_FLAG_LOCAL_SYMBOLS) (-28)"
+    "osal_loader_UT|ut_osloader_symtable_test.c:158 - OS_ModuleLoad(&module_id, \"Mod1\", UT_OS_GENERIC_MODULE_NAME2, OS_MODULE_FLAG_LOCAL_SYMBOLS) (-28)"
+)
 
 DO_CLEAN=0
 
@@ -101,14 +127,16 @@ build() {
         -DOSAL_INSTALL_LIBRARIES=OFF \
         -DENABLE_UNIT_TESTS=ON
     log "building osal and ${#TESTS[@]} tests"
-    cmake --build "${BUILD_DIR}" -j"$(nproc)" --target osal "${TESTS[@]}"
+    local t targets=()
+    for t in "${TESTS[@]}"; do targets+=("${t##*/}"); done
+    cmake --build "${BUILD_DIR}" -j"$(nproc)" --target osal "${targets[@]}"
     log "OK   build"
 }
 
 check_static_only() {
     local t bin bad=0
     for t in "${TESTS[@]}"; do
-        bin="${BUILD_DIR}/tests/${t}"
+        bin="${BUILD_DIR}/${t}"
         [[ -x "${bin}" ]] || die "test binary missing: ${bin}"
         # FreeRTOS heap or dynamic object creation must not be present at all.
         if nm "${bin}" | grep -Eq '\b(pvPortMalloc|vPortFree|xTaskCreate|xQueueGenericCreate|xQueueCreateMutex|xQueueCreateCountingSemaphore|xTimerCreate|xEventGroupCreate)$'; then
@@ -120,27 +148,49 @@ check_static_only() {
     log "OK   no FreeRTOS heap or dynamic object creation in any test binary"
 }
 
+# Prints the number of KNOWN_FAILS entries for test $1 if every FAIL/TSF/TTF line in log $2 matches
+# one of them and the counts are equal; prints nothing otherwise.
+known_fails_match() {
+    local name="$1" out="$2" entry count=0 line ok
+    local -a lines=()
+    mapfile -t lines < <(grep -E '^\[ *(FAIL|TSF|TTF)\]' "${out}" || true)
+    for entry in "${KNOWN_FAILS[@]}"; do
+        [[ "${entry%%|*}" == "${name}" ]] && count=$(( count + 1 ))
+    done
+    (( count > 0 && count == ${#lines[@]} )) || return 0
+    for line in "${lines[@]}"; do
+        ok=0
+        for entry in "${KNOWN_FAILS[@]}"; do
+            if [[ "${entry%%|*}" == "${name}" && "${line}" == *"${entry#*|}"* ]]; then ok=1; break; fi
+        done
+        (( ok )) || return 0
+    done
+    echo "${count}"
+}
+
 run_tests() {
-    local r t rc fails total_runs=0 failed_runs=0 out summary
+    local r t name rc fails known total_runs=0 failed_runs=0 out summary na
     rm -rf "${RUN_DIR}"
     mkdir -p "${RUN_DIR}"
     for (( r = 1; r <= ROUNDS; r++ )); do
         for t in "${TESTS[@]}"; do
-            out="${RUN_DIR}/${t}.round${r}.log"
+            name="${t##*/}"
+            out="${RUN_DIR}/${name}.round${r}.log"
             rc=0
-            (cd "${BUILD_DIR}/tests" && timeout -s KILL "${RUN_TIMEOUT}" "./${t}") >"${out}" 2>&1 || rc=$?
+            (cd "${BUILD_DIR}/${t%/*}" && timeout -s KILL "${RUN_TIMEOUT}" "./${name}") >"${out}" 2>&1 || rc=$?
             fails="$(grep -cE '^\[ *(FAIL|TSF|TTF)\]' "${out}" || true)"
+            na="$(grep -cE '^\[ *N/A\]' "${out}" || true)"
             summary="$(grep -E '^\[ *END\] [0-9]+ ' "${out}" | grep -v 'No test cases' | tail -1 | sed 's/  */ /g' || true)"
             total_runs=$(( total_runs + 1 ))
-            if [[ "${t}" == "${KNOWN_SIM_TEST}" && "${fails}" == 1 && "${rc}" == 1 ]] \
-                && grep -E '^\[ *FAIL\]' "${out}" | grep -qF -- "${KNOWN_SIM_ASSERT}"; then
-                log "OK   round ${r} ${t}: ${summary} (the 1 FAIL is the known simulator limitation, D22)"
-            elif (( rc == 0 && fails == 0 )); then
-                log "OK   round ${r} ${t}: ${summary}"
+            known="$(known_fails_match "${name}" "${out}")"
+            if (( rc == 0 && fails == 0 )); then
+                log "OK   round ${r} ${name}: ${summary} N/A::${na}"
+            elif [[ -n "${known}" && "${rc}" == 1 ]]; then
+                log "OK   round ${r} ${name}: ${summary} N/A::${na} (the ${known} failed assertion(s) are the listed known ones)"
             else
                 failed_runs=$(( failed_runs + 1 ))
-                log "ERROR round ${r} ${t}: exit ${rc}, ${fails} failed assertion(s): ${summary:-(no summary)}"
-                grep -E '^\[ *(FAIL|TSF|TTF)\]' "${out}" | head -5 | sed 's/^/        /' || true
+                log "ERROR round ${r} ${name}: exit ${rc}, ${fails} failed assertion(s): ${summary:-(no summary)}"
+                grep -E '^\[ *(FAIL|TSF|TTF)\]' "${out}" | head -10 | sed 's/^/        /' || true
             fi
         done
     done

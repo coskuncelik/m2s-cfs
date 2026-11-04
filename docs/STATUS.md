@@ -12,7 +12,7 @@ Last updated: 2026-11-04. Read this first when resuming. Rules: `CLAUDE.md`. Dec
 | 03 FreeRTOS POSIX smoke test (patch 0001, idle hook) | done; re-run 2026-11-04 after config changes: 10/10 PASS; re-run on new host 2026-11-04: 10/10 PASS | `docs/test-results/03-freertos-posix-smoke.md` |
 | 04a OSAL FreeRTOS core layer + simulator BSP | done (closed 2026-11-04) | `docs/test-results/04a-osal-freertos-sim.md` |
 | **04b static RAM file system (D19, D25)** | **closed 2026-11-04 (user approved)** | `docs/test-results/04b-ramfs-sim.md` |
-| 04c full OSAL functional test set | not started; needs approval | — |
+| **04c full OSAL functional test set (D26)** | **closed 2026-11-04 (user approved)** | `docs/test-results/04c-osal-unit-tests-sim.md` |
 | PSP, cFE on the simulator, counter_app, SmartFusion2 target | not planned in detail yet | — |
 
 ## 04a: where it stands
@@ -55,7 +55,15 @@ no code change. Reopen if it appears again.
 
 `ROUNDS=3 ./scripts/04-build-osal-freertos-sim.sh --clean` exit 0: core test 109/109, 42/42 OSAL runs
 (file-api-test 140/140, file-sys-add-fixed-map-api-test 8/8). Closed and committed 2026-11-04 (user approved).
-Next: 04c (OSAL `src/unit-tests`) needs its own plan and approval.
+04c plan approved 2026-11-04 (recommendations: include the 5 skipped `src/tests`, include osal_loader_UT,
+leave out `unit-test-coverage`, fix clear bugs directly).
+
+## 04c: result
+
+`ROUNDS=3 ./scripts/04-build-osal-freertos-sim.sh --clean` exit 0: 25 programs × 3 rounds, 75/75 passed, same
+summaries in every round. One bug fixed (too few file entries on small RAM disks); simulator pool raised to
+1 MiB; 12 assertions tolerated for features off by configuration (D26). Closed and committed 2026-11-04 (user
+approved). Next: the next step (PSP / cFE on the simulator) needs its own plan and approval.
 
 ## Environment facts that matter
 - Current host (since 2026-11-04): Docker container, 2 vCPU Xeon Platinum 8370C, Ubuntu 24.04.5. No effective

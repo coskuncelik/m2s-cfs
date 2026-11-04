@@ -88,10 +88,25 @@ static int64 OS_FreeRTOS_RamFsNow(void)
     return now.ticks;
 }
 
+/*
+ * Entries for a volume: one per BYTES_PER_NODE bytes, but at least enough for every OSAL file to be open
+ * at once on one volume (OS_MAX_NUM_OPEN_FILES + 8), so on a small disk the open-file limit is reached
+ * before the entry table. The minimum is capped at one entry per 256 bytes (tables <= ~1/5 of the
+ * volume) so tiny volumes still have room for data; never fewer than 8.
+ */
 static uint32 OS_FreeRTOS_RamFsNodeCount(size_t bytes)
 {
-    size_t nodes = bytes / OS_FREERTOS_RAMFS_BYTES_PER_NODE;
+    size_t nodes   = bytes / OS_FREERTOS_RAMFS_BYTES_PER_NODE;
+    size_t minimum = (size_t)OS_MAX_NUM_OPEN_FILES + 8U;
 
+    if (minimum > bytes / 256U)
+    {
+        minimum = bytes / 256U;
+    }
+    if (nodes < minimum)
+    {
+        nodes = minimum;
+    }
     if (nodes < 8U)
     {
         nodes = 8U;

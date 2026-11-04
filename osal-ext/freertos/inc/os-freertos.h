@@ -82,12 +82,14 @@
 
 /*
  * Static RAM file system (os-impl-filesys.c, step 04b):
- *  - POOL_BYTES: static pool for RAM disks created without caller memory (OS_mkfs(NULL, ...));
+ *  - POOL_BYTES: static pool for RAM disks created without caller memory (OS_mkfs(NULL, ...)); 1 MiB is
+ *    the simulator value (OSAL symbol-api-test asks for a 1 MiB disk, D26); the board value is open;
  *  - ROOT_BYTES / ROOT_BLOCK_SIZE: built-in root volume holding the fixed-map directories (/cf ...);
- *  - BYTES_PER_NODE: one file/directory entry per this many volume bytes (8 .. 4096 entries).
+ *  - BYTES_PER_NODE: one file/directory entry per this many volume bytes (8 .. 4096 entries), but at
+ *    least OS_MAX_NUM_OPEN_FILES + 8 where the volume has 256 bytes per entry (os-impl-filesys.c).
  */
 #ifndef OS_FREERTOS_RAMFS_POOL_BYTES
-#define OS_FREERTOS_RAMFS_POOL_BYTES (256U * 1024U)
+#define OS_FREERTOS_RAMFS_POOL_BYTES (1024U * 1024U)
 #endif
 #ifndef OS_FREERTOS_RAMFS_ROOT_BYTES
 #define OS_FREERTOS_RAMFS_ROOT_BYTES (32U * 1024U)
