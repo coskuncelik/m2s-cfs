@@ -47,5 +47,9 @@ function(m2s_add_freertos_posix_kernel TARGET)
         ${M2S_FREERTOS_PORT_DIR}/utils
     )
     target_compile_options(${TARGET} PRIVATE -Wall -Wextra)
+    # The POSIX port needs POSIX/GNU host APIs (robust mutexes, clock_gettime). cFE builds all target code
+    # with -std=c99, which hides them, so request them explicitly. Host-only (simulator kernel).
+    # Empty value, identical to the "#define _GNU_SOURCE" in port.c (no redefinition warning).
+    target_compile_definitions(${TARGET} PRIVATE _GNU_SOURCE=)
     target_link_libraries(${TARGET} PUBLIC Threads::Threads)
 endfunction()

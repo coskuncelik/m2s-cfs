@@ -13,12 +13,13 @@ NASA cFS/cFE on FreeRTOS Kernel V11.3.2, targeting:
 ./scripts/02-build-native-baseline.sh # build stock cFS (native POSIX OSAL) and smoke-run it for 10 s
 ./scripts/03-build-freertos-posix-smoke.sh # FreeRTOS V11.3.2 POSIX port smoke test (no cFE), 10 timed runs
 ./scripts/04-build-osal-freertos-sim.sh --clean # OSAL on FreeRTOS (simulator BSP): 25 OSAL functional test programs x3 + RAM file system core test
+./scripts/05-build-cfe-freertos-sim.sh --clean  # stock cFE core (no apps) on FreeRTOS with the project PSP, 5 runs of 20 s
 ```
 
 ## Documentation
 
 - `CLAUDE.md` — working rules
-- `docs/ARCHITECTURE.md` — how OSAL runs on FreeRTOS (layers, design)
+- `docs/ARCHITECTURE.md` — how cFE and OSAL run on FreeRTOS (layers, design)
 - `docs/VERSIONS.md` — exact source revisions
 - `docs/REFERENCES.md` — reference projects and findings
 - `docs/STATUS.md` — current progress and next actions
@@ -32,5 +33,6 @@ The pinned FreeRTOS kernel runs on the Linux host (POSIX port, static allocation
 static-memory OS layer: 12 OSAL functional tests pass (`docs/test-results/04a-osal-freertos-sim.md`), and with
 the static RAM file system the OSAL file tests pass too (`docs/test-results/04b-ramfs-sim.md`). All 25 OSAL
 functional test programs run, failing only on documented simulator limits and features left out
-(`docs/test-results/04c-osal-unit-tests-sim.md`). cFE and the
-SmartFusion2 target are not done yet.
+(`docs/test-results/04c-osal-unit-tests-sim.md`). Stock cFE core (no apps yet) starts and runs on FreeRTOS on
+the simulator with a project PSP, from static memory only (`docs/test-results/05-cfe-freertos-sim.md`).
+`counter_app` and the SmartFusion2 target are not done yet.

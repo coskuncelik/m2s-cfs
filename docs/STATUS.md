@@ -13,7 +13,8 @@ Last updated: 2026-11-04. Read this first when resuming. Rules: `CLAUDE.md`. Dec
 | 04a OSAL FreeRTOS core layer + simulator BSP | done (closed 2026-11-04) | `docs/test-results/04a-osal-freertos-sim.md` |
 | **04b static RAM file system (D19, D25)** | **closed 2026-11-04 (user approved)** | `docs/test-results/04b-ramfs-sim.md` |
 | **04c full OSAL functional test set (D26)** | **closed 2026-11-04 (user approved)** | `docs/test-results/04c-osal-unit-tests-sim.md` |
-| PSP, cFE on the simulator, counter_app, SmartFusion2 target | not planned in detail yet | — |
+| **05 PSP and cFE core on the simulator (D27)** | **closed 2026-11-04 (user approved)** | `docs/test-results/05-cfe-freertos-sim.md` |
+| 05b cFE functional tests, counter_app, SmartFusion2 target | not planned in detail yet | — |
 
 ## 04a: where it stands
 
@@ -63,7 +64,16 @@ leave out `unit-test-coverage`, fix clear bugs directly).
 `ROUNDS=3 ./scripts/04-build-osal-freertos-sim.sh --clean` exit 0: 25 programs × 3 rounds, 75/75 passed, same
 summaries in every round. One bug fixed (too few file entries on small RAM disks); simulator pool raised to
 1 MiB; 12 assertions tolerated for features off by configuration (D26). Closed and committed 2026-11-04 (user
-approved). Next: the next step (PSP / cFE on the simulator) needs its own plan and approval.
+approved).
+
+## 05: result
+
+Plan approved 2026-11-04 (recommendations: build-time PSP copy, own `timebase_freertos`, embedded startup
+script now, cFE functional tests later in 05b). `./scripts/05-build-cfe-freertos-sim.sh --clean` exit 0: stock
+cFE core (no apps) builds on the FreeRTOS OSAL with the project PSP, reaches OPERATIONAL with the embedded startup
+script, 5/5 runs of 20 s; no `malloc`/`free` outside the host POSIX port. Steps 03 and 04 re-run after the kernel
+CMake change (`_GNU_SOURCE=`). Closed and committed 2026-11-04 (user approved). Next (when resuming): choose
+05b (cFE functional tests) or `counter_app`; each needs its own plan and approval.
 
 ## Environment facts that matter
 - Current host (since 2026-11-04): Docker container, 2 vCPU Xeon Platinum 8370C, Ubuntu 24.04.5. No effective

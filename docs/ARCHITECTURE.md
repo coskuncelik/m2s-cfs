@@ -1,12 +1,18 @@
-# Architecture — OSAL on FreeRTOS
+# Architecture — cFE and OSAL on FreeRTOS
 
-How the pinned NASA OSAL runs on FreeRTOS V11.3.2 in this project. Current scope: steps 04a (OSAL core layer and
-the Linux simulator BSP), 04b (static RAM file system) and 04c (all OSAL functional tests). cFE, the PSP and the SmartFusion2 BSP do not exist yet. Decisions are in `DECISIONS.md`.
+How the pinned NASA cFE and OSAL run on FreeRTOS V11.3.2 in this project. Current scope: steps 04a (OSAL core
+layer and the Linux simulator BSP), 04b (static RAM file system), 04c (all OSAL functional tests) and 05 (PSP and
+cFE core on the simulator, no apps). The SmartFusion2 BSP/PSP do not exist yet. Decisions are in `DECISIONS.md`.
 
 ## Layers
 
 ```
- application / OSAL tests           (later: cFE + counter_app)
+ application / OSAL tests           (later: counter_app)
+ ───────────────────────────────────────────────────────────────
+ cFE core (ES, EVS, SB, TBL, TIME)  sources/cFS/cfe                     pinned, unmodified
+ ───────────────────────────────────────────────────────────────
+ cFE PSP "freertos-posix-sim"      psp-ext/ + stock PSP shared code    project code (D27)
+   start-up, static reserved memory, /cf + embedded script, timebase_freertos
  ───────────────────────────────────────────────────────────────
  OSAL public API + shared layer     sources/cFS/osal/src/os/shared      pinned, unmodified
    argument checks, object id tables, OS_TimeBase_CallbackThread, console ring buffer
@@ -71,11 +77,30 @@ creation symbol or the FreeRTOS heap appears in a test binary. Evidence:
 - Console output uses `write(1)`, not stdio, to avoid glibc stdio locks across port task switches.
 - `OS_BSP_Lock_Impl` is a static recursive FreeRTOS mutex. `configASSERT` failures print and `abort()`.
 
+## PSP (`psp-ext/`) and cFE build (step 05)
+
+cFE only finds a PSP platform inside the PSP tree (`psp/fsw/<CFE_SYSTEM_PSPNAME>`). Script 05 therefore copies
+`sources/cFS/psp` to `build/cfe-freertos-sim/psp-tree/psp`, adds `psp-ext/fsw/freertos-posix-sim` and
+`psp-ext/fsw/modules/timebase_freertos`, and passes the copy to cFE with `CFS_APP_PATH` (D27). The mission config is
+`config/cfe/freertos-posix-sim/` (`MISSION_DEFS`): one CPU, no apps, toolchain `freertos-posix-sim` (OSTYPE
+`freertos`, BSP and PSP `freertos-posix-sim`, `OSAL_EXT_SOURCE_DIR`), the step 04 OSAL config, cFE's strict
+compile flags.
+
+| Area | File | Design |
+|---|---|---|
+| Start-up | `cfe_psp_start.c` | `OS_Application_Startup` (called by the BSP task): OSAL init → reserved memory map → `/cf` fixed map → embedded startup script written to `/cf/cfe_es_startup.scr` (D5) → PSP modules → `CFE_ES_Main`, always a power-on reset. `OS_Application_Run` sleeps forever. |
+| Reserved memory | `cfe_psp_memory.c` | One static 4 MiB array, laid out at start-up from the sizes cFE reports (reset area, 2 MiB `/ram` disk, CDS, user area); start-up stops if they do not fit. CDS reads/writes are bounds-checked. |
+| Time base | `modules/timebase_freertos` | FreeRTOS tick extended to 64 bits; 1 ms resolution. Shared by simulator and board. |
+| Restart, panic | `cfe_psp_support.c` | End the simulator process. |
+| Watchdog, exceptions, SSR | `cfe_psp_watchdog.c`, `cfe_psp_exception.c`, `cfe_psp_ssr.c` | Stubs (none on the simulator). |
+| Stock modules | `soft_timebase`, `eeprom_notimpl`, `ram_direct`, `port_notimpl`, `iodriver` | Unchanged. |
+
 ## Host-side versus embedded memory
 
 On the simulator, the FreeRTOS POSIX port allocates its per-thread bookkeeping with glibc `malloc` and runs each
 task on a host pthread stack; OSAL's test harness (`ut_assert`) also uses `malloc`. These are host-only. The OS
-layer, the BSP and OSAL's shared layer do not reference `malloc`/`free`. The Cortex-M3 image will need its own
+layer, the BSP, OSAL's shared layer, the PSP and cFE do not reference `malloc`/`free` (step 05 checks every object
+linked into `core-cpu1`). The Cortex-M3 image will need its own
 evidence (link map, `malloc`/`_sbrk` trap), which does not exist yet.
 
 ## Simulator limitations

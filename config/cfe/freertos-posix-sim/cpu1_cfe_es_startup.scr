@@ -1,0 +1,5 @@
+!
+! m2s-cfs cFE startup script for cpu1 (step 05): no applications yet.
+! Embedded in core-cpu1 (cpu1_EMBED_FILELIST) and written to /cf/cfe_es_startup.scr by the PSP (D5).
+! cFE stops parsing at the first '!'.
+!
