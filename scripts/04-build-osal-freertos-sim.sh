@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 04-build-osal-freertos-sim.sh — build OSAL with the m2s-cfs FreeRTOS layer on the Linux
-# simulator and run OSAL's functional tests (step 04a).
+# simulator and run OSAL's functional tests (steps 04a, 04b).
 #
 #   OS layer : osal-ext/freertos            (OSAL_SYSTEM_OSTYPE=freertos)
 #   BSP      : osal-ext/freertos-posix-sim  (OSAL_SYSTEM_BSPTYPE=freertos-posix-sim)
@@ -8,6 +8,7 @@
 #   sources  : sources/cFS/osal (pinned, unmodified) via OSAL_EXT_SOURCE_DIR
 #
 # Checks:
+#   0. RAM file system core test (tests/ramfs-core, host gcc with ASan/UBSan, no FreeRTOS);
 #   1. configure + build the OSAL library and the 04a tests (project code: -Wall -Wextra -Werror);
 #   2. no FreeRTOS heap and no dynamic FreeRTOS object creation in any test binary;
 #   3. each test runs ROUNDS times; every run must exit 0 and report no FAIL/TSF/TTF;
@@ -34,6 +35,7 @@ TESTS=(
     bin-sem-test bin-sem-timeout-test count-sem-test count-sem-timeout-test
     idmap-api-test sem-speed-test
     timer-test time-base-api-test timer-add-api-test
+    file-api-test file-sys-add-fixed-map-api-test
 )
 
 # Known simulator limitation (docs/DECISIONS.md D22): on the FreeRTOS POSIX port a task runs on a
@@ -72,6 +74,17 @@ check_prerequisites() {
 sources_status() {
     git -C "${ROOT_DIR}/sources/cFS" status --porcelain --ignore-submodules=none
     git -C "${KERNEL_DIR}" status --porcelain --ignore-submodules=none
+}
+
+run_ramfs_core_test() {
+    local bin="${BUILD_DIR}/ramfs-core-test"
+    mkdir -p "${BUILD_DIR}"
+    gcc -std=c99 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-sanitize-recover=all \
+        -I "${EXT_DIR}/freertos/inc" "${EXT_DIR}/freertos/src/os-ramfs.c" \
+        "${ROOT_DIR}/tests/ramfs-core/ramfs_core_test.c" -o "${bin}" \
+        || die "cannot build the RAM file system core test (gcc with -fsanitize=address,undefined needed)"
+    "${bin}" || die "RAM file system core test failed"
+    log "OK   RAM file system core test"
 }
 
 build() {
@@ -146,6 +159,7 @@ main() {
     before="$(sources_status)"
 
     build
+    run_ramfs_core_test
     check_static_only
     run_tests
 

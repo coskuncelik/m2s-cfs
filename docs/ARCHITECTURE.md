@@ -1,7 +1,7 @@
 # Architecture — OSAL on FreeRTOS
 
-How the pinned NASA OSAL runs on FreeRTOS V11.3.2 in this project. Current scope: step 04a (OSAL core layer and
-the Linux simulator BSP). cFE, the PSP and the SmartFusion2 BSP do not exist yet. Decisions are in `DECISIONS.md`.
+How the pinned NASA OSAL runs on FreeRTOS V11.3.2 in this project. Current scope: steps 04a (OSAL core layer and
+the Linux simulator BSP) and 04b (static RAM file system). cFE, the PSP and the SmartFusion2 BSP do not exist yet. Decisions are in `DECISIONS.md`.
 
 ## Layers
 
@@ -55,7 +55,7 @@ test), which applies patch 0001 to a copy of `port.c` in the build tree. The ker
 | Time bases | `os-impl-timebase.c` | One static helper task per time base runs OSAL's callback thread, sleeping to absolute tick deadlines. Delete is cooperative, with a forced delete as fallback. The FreeRTOS timer service is not used. |
 | Clock | `os-impl-clock.c` | Local time = time set + ticks since (32-bit tick extended to 64 bits). 1 kHz tick. |
 | Console | `os-impl-console.c` | `OS_printf` → OSAL ring buffer → static console task → BSP output. |
-| Files | `os-impl-no-filesys.c` | Placeholder: everything returns `OS_ERR_NOT_IMPLEMENTED`. Replaced by the static RAM file system in 04b (D19). |
+| Files | `os-ramfs.c`, `os-impl-filesys.c` | Static RAM file system (D19, D25). The core keeps a volume in one memory area: header, file/directory entries (one per 2 KiB of volume), a block table linking each file's fixed-size blocks, and the blocks. `OS_mkfs` uses the caller's memory, or an area of a 256 KiB static pool if none is given. RAM disk paths are `ramfs:<n>/…`; fixed maps such as `/cf` are directories of a built-in 32 KiB root volume. One static mutex serialises all file calls. |
 | Not supported | OSAL `portable/os-impl-no-*.c` | Condition variables, shell, loader, symbol table, network, sockets, select. |
 
 All FreeRTOS objects are created with the `*Static` APIs from memory defined in this layer.

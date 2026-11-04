@@ -11,7 +11,7 @@ Last updated: 2026-11-04. Read this first when resuming. Rules: `CLAUDE.md`. Dec
 | 02 stock native-POSIX cFS baseline | done | `docs/test-results/02-native-baseline.md` |
 | 03 FreeRTOS POSIX smoke test (patch 0001, idle hook) | done; re-run 2026-11-04 after config changes: 10/10 PASS; re-run on new host 2026-11-04: 10/10 PASS | `docs/test-results/03-freertos-posix-smoke.md` |
 | 04a OSAL FreeRTOS core layer + simulator BSP | done (closed 2026-11-04) | `docs/test-results/04a-osal-freertos-sim.md` |
-| **04b static RAM file system (D19)** | **next; not started, needs approval** | — |
+| **04b static RAM file system (D19, D25)** | **closed 2026-11-04 (user approved)** | `docs/test-results/04b-ramfs-sim.md` |
 | 04c full OSAL functional test set | not started; needs approval | — |
 | PSP, cFE on the simulator, counter_app, SmartFusion2 target | not planned in detail yet | — |
 
@@ -28,8 +28,8 @@ Design in short (details in file headers):
   task notifications (index 1); supports flush. Mutexes: static recursive mutexes.
 - Queues: static FreeRTOS queue per slot, items = [length][payload], staging buffers under static mutexes.
 - Timebase: static helper task sleeping to absolute tick deadlines; cooperative delete.
-- Clock: tick count + epoch. Console: async static task -> BSP `write(1)`. Files: `os-impl-no-filesys.c`
-  placeholder (OS_ERR_NOT_IMPLEMENTED) until 04b.
+- Clock: tick count + epoch. Console: async static task -> BSP `write(1)`. Files: static RAM file system since
+  04b (`os-ramfs.c` + `os-impl-filesys.c`, D25).
 - BSP: pins the process to one CPU (D21), static main task, `exit()` with the test status.
 
 Last full run (2026-11-03/04, 3 rounds): all 12 tests pass except
@@ -49,7 +49,13 @@ no code change. Reopen if it appears again.
 2. ~~Re-run script 04 with `--clean` after D22~~ — done 2026-11-04 on the new host: 36/36 passed.
 3. ~~Write the 04a result, architecture doc and README line~~ — done 2026-11-04: `docs/test-results/04a-osal-freertos-sim.md`,
    `docs/ARCHITECTURE.md`, README updated.
-4. Ask for approval of 04b (next).
+4. ~~Ask for approval of 04b~~ — approved and implemented 2026-11-04.
+
+## 04b: result
+
+`ROUNDS=3 ./scripts/04-build-osal-freertos-sim.sh --clean` exit 0: core test 109/109, 42/42 OSAL runs
+(file-api-test 140/140, file-sys-add-fixed-map-api-test 8/8). Closed and committed 2026-11-04 (user approved).
+Next: 04c (OSAL `src/unit-tests`) needs its own plan and approval.
 
 ## Environment facts that matter
 - Current host (since 2026-11-04): Docker container, 2 vCPU Xeon Platinum 8370C, Ubuntu 24.04.5. No effective

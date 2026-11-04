@@ -18,7 +18,8 @@ add_library(osal_freertos_impl OBJECT
     src/os-impl-sem.c
     src/os-impl-tasks.c
     src/os-impl-timebase.c
-    src/os-impl-no-filesys.c                # step 04a placeholder, replaced in 04b
+    src/os-impl-filesys.c                   # static RAM file system (04b)
+    src/os-ramfs.c
 
     # OSAL portable blocks
     ${OSAL_SOURCE_DIR}/src/os/portable/os-impl-console-bsp.c
@@ -43,5 +44,5 @@ set_source_files_properties(
     src/os-impl-binsem.c src/os-impl-clock.c src/os-impl-common.c src/os-impl-console.c
     src/os-impl-countsem.c src/os-impl-idmap.c src/os-impl-misc.c src/os-impl-mutex.c
     src/os-impl-queues.c src/os-impl-sem.c src/os-impl-tasks.c src/os-impl-timebase.c
-    src/os-impl-no-filesys.c
+    src/os-impl-filesys.c src/os-ramfs.c
     PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra;-Werror")

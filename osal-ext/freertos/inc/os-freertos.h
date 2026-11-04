@@ -80,6 +80,25 @@
 #define OS_FREERTOS_TIMEBASE_EXIT_WAIT_MS 1000
 #endif
 
+/*
+ * Static RAM file system (os-impl-filesys.c, step 04b):
+ *  - POOL_BYTES: static pool for RAM disks created without caller memory (OS_mkfs(NULL, ...));
+ *  - ROOT_BYTES / ROOT_BLOCK_SIZE: built-in root volume holding the fixed-map directories (/cf ...);
+ *  - BYTES_PER_NODE: one file/directory entry per this many volume bytes (8 .. 4096 entries).
+ */
+#ifndef OS_FREERTOS_RAMFS_POOL_BYTES
+#define OS_FREERTOS_RAMFS_POOL_BYTES (256U * 1024U)
+#endif
+#ifndef OS_FREERTOS_RAMFS_ROOT_BYTES
+#define OS_FREERTOS_RAMFS_ROOT_BYTES (32U * 1024U)
+#endif
+#ifndef OS_FREERTOS_RAMFS_ROOT_BLOCK_SIZE
+#define OS_FREERTOS_RAMFS_ROOT_BLOCK_SIZE 512U
+#endif
+#ifndef OS_FREERTOS_RAMFS_BYTES_PER_NODE
+#define OS_FREERTOS_RAMFS_BYTES_PER_NODE 2048U
+#endif
+
 /* Thread-local storage and notification slots used by this layer. */
 #define OS_FREERTOS_TLS_TASK_ID     0
 #define OS_FREERTOS_TLS_SEM_WAITER  1
@@ -128,6 +147,7 @@ int32 OS_FreeRTOS_QueueAPI_Impl_Init(void);
 int32 OS_FreeRTOS_BinSemAPI_Impl_Init(void);
 int32 OS_FreeRTOS_CountSemAPI_Impl_Init(void);
 int32 OS_FreeRTOS_MutexAPI_Impl_Init(void);
+int32 OS_FreeRTOS_FileSysAPI_Impl_Init(void);
 int32 OS_FreeRTOS_TimeBaseAPI_Impl_Init(void);
 
 #endif /* OS_FREERTOS_H */

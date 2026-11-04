@@ -12,7 +12,7 @@ NASA cFS/cFE on FreeRTOS Kernel V11.3.2, targeting:
 ./scripts/01-check-prerequisites.sh  # read-only host tool check; prints the apt command for anything missing
 ./scripts/02-build-native-baseline.sh # build stock cFS (native POSIX OSAL) and smoke-run it for 10 s
 ./scripts/03-build-freertos-posix-smoke.sh # FreeRTOS V11.3.2 POSIX port smoke test (no cFE), 10 timed runs
-./scripts/04-build-osal-freertos-sim.sh --clean # OSAL on FreeRTOS (simulator BSP): 12 OSAL functional tests x3
+./scripts/04-build-osal-freertos-sim.sh --clean # OSAL on FreeRTOS (simulator BSP): 14 OSAL functional tests x3 + RAM file system core test
 ```
 
 ## Documentation
@@ -29,5 +29,6 @@ NASA cFS/cFE on FreeRTOS Kernel V11.3.2, targeting:
 Status: the stock native-POSIX cFS baseline builds and runs (`docs/test-results/02-native-baseline.md`).
 The pinned FreeRTOS kernel runs on the Linux host (POSIX port, static allocation, patch 0001), without cFE
 (`docs/test-results/03-freertos-posix-smoke.md`). OSAL runs on FreeRTOS on the simulator with a project-owned,
-static-memory OS layer: 12 OSAL functional tests pass (`docs/test-results/04a-osal-freertos-sim.md`). File
-system, cFE and the SmartFusion2 target are not done yet.
+static-memory OS layer: 12 OSAL functional tests pass (`docs/test-results/04a-osal-freertos-sim.md`), and with
+the static RAM file system the OSAL file tests pass too (`docs/test-results/04b-ramfs-sim.md`). cFE and the
+SmartFusion2 target are not done yet.
