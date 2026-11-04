@@ -1,0 +1,102 @@
+m2s-cfs patch for FreeRTOS-Kernel V11.3.2 (8a59a4b19bf72977819feddef87d41163ced7004)
+File: portable/ThirdParty/GCC/Posix/port.c  (Linux simulator only; not used on the Cortex-M3 target)
+
+Problem (measured 2026-11-03, see docs/test-results/03-freertos-posix-smoke.md):
+  The tick thread is a loop of pthread_kill(SIGALRM) + usleep(1 ms). On the development VM
+  usleep(1000) takes ~2.7 ms, so FreeRTOS time ran at 0.38-0.44x real time. Pending SIGALRMs
+  also coalesce, so late ticks are lost for good.
+
+Change:
+  1. The tick thread sleeps to absolute 1 ms deadlines (clock_nanosleep TIMER_ABSTIME), so sleep
+     overshoot does not accumulate.
+  2. The SIGALRM handler computes the number of due ticks from CLOCK_MONOTONIC and calls
+     xTaskIncrementTick() once per due tick; a context switch is done once if any call asked for it.
+  3. prvStartTimeNs is set before the tick thread is created (it was set after).
+
+Apply (never in sources/): patch -o <build>/port.c sources/FreeRTOS-Kernel/portable/ThirdParty/GCC/Posix/port.c <this file>
+
+--- a/portable/ThirdParty/GCC/Posix/port.c
++++ b/portable/ThirdParty/GCC/Posix/port.c
+@@ -111,6 +111,7 @@
+ static pthread_t hTimerTickThread;
+ static bool xTimerTickThreadShouldRun;
+ static uint64_t prvStartTimeNs;
++static uint64_t prvTicksProcessed; /* m2s-cfs: ticks already passed to xTaskIncrementTick() */
+ static pthread_key_t xThreadKey = 0;
+ /*-----------------------------------------------------------*/
+ 
+@@ -451,6 +452,9 @@
+ 
+ static void * prvTimerTickHandler( void * arg )
+ {
++    uint64_t xNextNs = prvStartTimeNs;
++    struct timespec xDeadline;
++
+     ( void ) arg;
+ 
+     prvMarkAsFreeRTOSThread();
+@@ -465,7 +469,16 @@
+          */
+         Thread_t * thread = prvGetThreadFromTask( xTaskGetCurrentTaskHandle() );
+         pthread_kill( thread->pthread, SIGALRM );
+-        usleep( portTICK_RATE_MICROSECONDS );
++
++        /* m2s-cfs: sleep to an absolute deadline instead of a relative usleep(),
++         * so host sleep overshoot does not accumulate. */
++        xNextNs += ( uint64_t ) portTICK_RATE_MICROSECONDS * 1000ULL;
++        xDeadline.tv_sec = ( time_t ) ( xNextNs / 1000000000ULL );
++        xDeadline.tv_nsec = ( long ) ( xNextNs % 1000000000ULL );
++
++        while( clock_nanosleep( CLOCK_MONOTONIC, TIMER_ABSTIME, &xDeadline, NULL ) == EINTR )
++        {
++        }
+     }
+ 
+     return NULL;
+@@ -478,10 +491,12 @@
+  */
+ void prvSetupTimerInterrupt( void )
+ {
++    /* m2s-cfs: the start time is set before the tick thread uses it. */
++    prvStartTimeNs = prvGetTimeNs();
++    prvTicksProcessed = 0;
++
+     xTimerTickThreadShouldRun = true;
+     pthread_create( &hTimerTickThread, NULL, prvTimerTickHandler, NULL );
+-
+-    prvStartTimeNs = prvGetTimeNs();
+ }
+ /*-----------------------------------------------------------*/
+ 
+@@ -491,6 +506,8 @@
+     {
+         Thread_t * pxThreadToSuspend;
+         Thread_t * pxThreadToResume;
++        BaseType_t xSwitchRequired = pdFALSE; /* m2s-cfs */
++        uint64_t xTicksDue;                   /* m2s-cfs */
+ 
+         ( void ) sig;
+ 
+@@ -498,7 +515,21 @@
+ 
+         pxThreadToSuspend = prvGetThreadFromTask( xTaskGetCurrentTaskHandle() );
+ 
+-        if( xTaskIncrementTick() != pdFALSE )
++        /* m2s-cfs: SIGALRMs can coalesce or arrive late, so derive the number of
++         * due ticks from the monotonic clock and process all of them. */
++        xTicksDue = ( prvGetTimeNs() - prvStartTimeNs ) / ( ( uint64_t ) portTICK_RATE_MICROSECONDS * 1000ULL );
++
++        while( prvTicksProcessed < xTicksDue )
++        {
++            prvTicksProcessed++;
++
++            if( xTaskIncrementTick() != pdFALSE )
++            {
++                xSwitchRequired = pdTRUE;
++            }
++        }
++
++        if( xSwitchRequired != pdFALSE )
+         {
+             /* Select Next Task. */
+             vTaskSwitchContext();

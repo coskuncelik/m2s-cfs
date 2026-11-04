@@ -1,0 +1,12 @@
+[submodule "sources/cFS"]
+	path = sources/cFS
+	url = https://github.com/nasa/cFS.git
+[submodule "sources/FreeRTOS-Kernel"]
+	path = sources/FreeRTOS-Kernel
+	url = https://github.com/FreeRTOS/FreeRTOS-Kernel.git
+[submodule "sources/references/mission-v0"]
+	path = sources/references/mission-v0
+	url = https://github.com/projetoChi2p/fs-nasa-cfs-mission-v0.git
+[submodule "sources/references/mission-v1"]
+	path = sources/references/mission-v1
+	url = https://github.com/projetoChi2p/fs-nasa-cfs-mission-v1.git

@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+# 04-build-osal-freertos-sim.sh — build OSAL with the m2s-cfs FreeRTOS layer on the Linux
+# simulator and run OSAL's functional tests (step 04a).
+#
+#   OS layer : osal-ext/freertos            (OSAL_SYSTEM_OSTYPE=freertos)
+#   BSP      : osal-ext/freertos-posix-sim  (OSAL_SYSTEM_BSPTYPE=freertos-posix-sim)
+#   config   : config/osal/freertos-posix-sim/osal_config.cmake, config/freertos/posix/
+#   sources  : sources/cFS/osal (pinned, unmodified) via OSAL_EXT_SOURCE_DIR
+#
+# Checks:
+#   1. configure + build the OSAL library and the 04a tests (project code: -Wall -Wextra -Werror);
+#   2. no FreeRTOS heap and no dynamic FreeRTOS object creation in any test binary;
+#   3. each test runs ROUNDS times; every run must exit 0 and report no FAIL/TSF/TTF;
+#   4. sources/cFS and sources/FreeRTOS-Kernel unchanged.
+#
+# Usage: ./scripts/04-build-osal-freertos-sim.sh [--clean]      (env: ROUNDS, default 3)
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="${M2S_CFS_ROOT:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
+OSAL_DIR="${ROOT_DIR}/sources/cFS/osal"
+KERNEL_DIR="${ROOT_DIR}/sources/FreeRTOS-Kernel"
+EXT_DIR="${ROOT_DIR}/osal-ext"
+OSAL_CONFIG="${ROOT_DIR}/config/osal/freertos-posix-sim/osal_config.cmake"
+BUILD_DIR="${ROOT_DIR}/build/osal-freertos-sim"
+LOG_DIR="${ROOT_DIR}/logs"
+LOG_FILE="${LOG_DIR}/04-build-osal-freertos-sim.log"
+RUN_DIR="${LOG_DIR}/04-osal-tests"
+ROUNDS="${ROUNDS:-3}"
+RUN_TIMEOUT=90
+
+TESTS=(
+    osal-core-test queue-test mutex-test
+    bin-sem-test bin-sem-timeout-test count-sem-test count-sem-timeout-test
+    idmap-api-test sem-speed-test
+    timer-test time-base-api-test timer-add-api-test
+)
+
+# Known simulator limitation (docs/DECISIONS.md D22): on the FreeRTOS POSIX port a task runs on a
+# host pthread stack, not on the stack buffer passed to OS_TaskCreate, so this single assertion
+# cannot pass on the simulator. Only this exact assertion is tolerated, only in this test.
+KNOWN_SIM_TEST="osal-core-test"
+KNOWN_SIM_ASSERT="osal-core-test.c:145 - cpuaddr: VarAddress"
+
+DO_CLEAN=0
+
+log() { printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"; }
+die() { log "FATAL: $*"; exit 1; }
+
+parse_args() {
+    local arg
+    for arg in "$@"; do
+        case "${arg}" in
+            --clean) DO_CLEAN=1 ;;
+            *) die "unknown argument '${arg}' (usage: $0 [--clean])" ;;
+        esac
+    done
+    [[ "${ROUNDS}" =~ ^[1-9][0-9]*$ ]] || die "ROUNDS must be a positive integer (got '${ROUNDS}')"
+}
+
+check_prerequisites() {
+    local tool
+    for tool in cmake make gcc patch nm timeout git; do
+        command -v "${tool}" >/dev/null 2>&1 || die "'${tool}' not found — run scripts/01-check-prerequisites.sh"
+    done
+    [[ -f "${OSAL_DIR}/CMakeLists.txt" ]] || die "sources/cFS not populated — run scripts/00-basic-setup.sh"
+    [[ -f "${KERNEL_DIR}/tasks.c" ]] || die "sources/FreeRTOS-Kernel not populated — run scripts/00-basic-setup.sh"
+    [[ -d "${EXT_DIR}/freertos" && -d "${EXT_DIR}/freertos-posix-sim" ]] || die "osal-ext/ not found"
+    [[ -f "${OSAL_CONFIG}" ]] || die "OSAL config not found: ${OSAL_CONFIG}"
+}
+
+sources_status() {
+    git -C "${ROOT_DIR}/sources/cFS" status --porcelain --ignore-submodules=none
+    git -C "${KERNEL_DIR}" status --porcelain --ignore-submodules=none
+}
+
+build() {
+    if (( DO_CLEAN )); then
+        log "removing ${BUILD_DIR}"
+        rm -rf "${BUILD_DIR}"
+    fi
+    log "configuring ${BUILD_DIR}"
+    cmake -S "${OSAL_DIR}" -B "${BUILD_DIR}" \
+        -DOSAL_SYSTEM_BSPTYPE=freertos-posix-sim \
+        -DOSAL_SYSTEM_OSTYPE=freertos \
+        -DOSAL_EXT_SOURCE_DIR="${EXT_DIR}" \
+        -DOSAL_CONFIGURATION_FILE="${OSAL_CONFIG}" \
+        -DOSAL_INSTALL_LIBRARIES=OFF \
+        -DENABLE_UNIT_TESTS=ON
+    log "building osal and ${#TESTS[@]} tests"
+    cmake --build "${BUILD_DIR}" -j"$(nproc)" --target osal "${TESTS[@]}"
+    log "OK   build"
+}
+
+check_static_only() {
+    local t bin bad=0
+    for t in "${TESTS[@]}"; do
+        bin="${BUILD_DIR}/tests/${t}"
+        [[ -x "${bin}" ]] || die "test binary missing: ${bin}"
+        # FreeRTOS heap or dynamic object creation must not be present at all.
+        if nm "${bin}" | grep -Eq '\b(pvPortMalloc|vPortFree|xTaskCreate|xQueueGenericCreate|xQueueCreateMutex|xQueueCreateCountingSemaphore|xTimerCreate|xEventGroupCreate)$'; then
+            log "ERROR ${t}: dynamic FreeRTOS allocation symbol found"
+            bad=1
+        fi
+    done
+    (( bad == 0 )) || die "dynamic FreeRTOS allocation found"
+    log "OK   no FreeRTOS heap or dynamic object creation in any test binary"
+}
+
+run_tests() {
+    local r t rc fails total_runs=0 failed_runs=0 out summary
+    rm -rf "${RUN_DIR}"
+    mkdir -p "${RUN_DIR}"
+    for (( r = 1; r <= ROUNDS; r++ )); do
+        for t in "${TESTS[@]}"; do
+            out="${RUN_DIR}/${t}.round${r}.log"
+            rc=0
+            (cd "${BUILD_DIR}/tests" && timeout -s KILL "${RUN_TIMEOUT}" "./${t}") >"${out}" 2>&1 || rc=$?
+            fails="$(grep -cE '^\[ *(FAIL|TSF|TTF)\]' "${out}" || true)"
+            summary="$(grep -E '^\[ *END\] [0-9]+ ' "${out}" | grep -v 'No test cases' | tail -1 | sed 's/  */ /g' || true)"
+            total_runs=$(( total_runs + 1 ))
+            if [[ "${t}" == "${KNOWN_SIM_TEST}" && "${fails}" == 1 && "${rc}" == 1 ]] \
+                && grep -E '^\[ *FAIL\]' "${out}" | grep -qF -- "${KNOWN_SIM_ASSERT}"; then
+                log "OK   round ${r} ${t}: ${summary} (the 1 FAIL is the known simulator limitation, D22)"
+            elif (( rc == 0 && fails == 0 )); then
+                log "OK   round ${r} ${t}: ${summary}"
+            else
+                failed_runs=$(( failed_runs + 1 ))
+                log "ERROR round ${r} ${t}: exit ${rc}, ${fails} failed assertion(s): ${summary:-(no summary)}"
+                grep -E '^\[ *(FAIL|TSF|TTF)\]' "${out}" | head -5 | sed 's/^/        /' || true
+            fi
+        done
+    done
+    log "test runs: $(( total_runs - failed_runs ))/${total_runs} passed (logs: ${RUN_DIR})"
+    (( failed_runs == 0 )) || die "OSAL functional tests failed"
+}
+
+main() {
+    parse_args "$@"
+    mkdir -p "${LOG_DIR}"
+    exec > >(tee -a "${LOG_FILE}") 2>&1
+    log "=== 04-build-osal-freertos-sim start (ROUNDS=${ROUNDS}) ==="
+
+    check_prerequisites
+    local before after
+    before="$(sources_status)"
+
+    build
+    check_static_only
+    run_tests
+
+    after="$(sources_status)"
+    [[ -z "${after}" && "${before}" == "${after}" ]] || die "sources/ working trees are not clean"
+    log "OK   sources/cFS and sources/FreeRTOS-Kernel unchanged and clean"
+    log "=== 04-build-osal-freertos-sim OK ==="
+}
+
+main "$@"
