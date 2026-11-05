@@ -17,7 +17,7 @@ Last updated: 2026-11-05. Read this first when resuming. Rules: `CLAUDE.md`. Dec
 | **06 counter_app on the simulator (D28)** | **closed 2026-11-05 (user approved)** | `docs/test-results/06-counter-app-sim.md` |
 | **05b cFE functional tests on the simulator (D29)** | **closed 2026-11-05 (user approved)** | `docs/test-results/05b-cfe-functional-tests-sim.md` |
 | **07 shareable bundle `cfs-m2s-freertos` (D30)** | **closed 2026-11-05 (user approved); published 2026-11-05: github.com/coskuncelik/cfs-m2s-freertos (public), commit `d48850f`** | `docs/test-results/07-export-bundle.md` |
-| 08 cross-build for Cortex-M3 (arm-none-eabi-gcc, GCC/ARM_CM3; link map, malloc/_sbrk trap, memory footprint) | future work (user, 2026-11-05); needs approval to install the toolchain | — |
+| **08 cross-build for Cortex-M3 (D31)** | **closed 2026-11-05 (user approved)** | `docs/test-results/08-cfe-arm-cm3-build.md` |
 | 09 run on an emulated Cortex-M3 (QEMU, e.g. mps2-an385; memory sizes to be checked) | future work (user, 2026-11-05); needs approval to install qemu-system-arm | — |
 | SmartFusion2 target | not planned in detail yet (blocked by D7) | — |
 
@@ -104,6 +104,16 @@ references, a fresh clone builds with stock `make prep && make && make install`,
 5/5. Regression 06/05/03/04 pass. Fixed on the way: `tables/staging` removed by cFE's `prepare()` (deferred mkdir,
 CMake >= 3.19). Closed and committed 2026-11-05 (user approved). Next: push the bundle to the GitHub
 repository https://github.com/coskuncelik/cfs-m2s-freertos (address given by the user). Pushed by the user 2026-11-05 (the codespace token cannot write to it; a fine-grained token was used), public, `main` = `d48850f` (source revision `76de858`), verified with git ls-remote.
+
+## 08: result
+
+Plan approved 2026-11-05 ("use script 01 approach, go on with your recommendations"); toolchain installed by the
+user (gcc-arm-none-eabi 13.2.1, binutils 2.42, newlib-nano 4.4.0). `./scripts/08-build-cfe-arm-cm3.sh --clean`
+exit 0: ARMv7-M Thumb-2 image, entry and vectors checked, link map, no allocator or heap linked (board traps,
+approved after newlib's `malloc` was found linked), footprint text 212077 / data 1296 / bss 7568804 on the
+placeholder board `boards/link-check`. Regression 06/05/04/07-check pass. The published bundle is now one line
+behind (`os-impl-filesys.c` 32-bit guard; no behaviour change on 64-bit); republish only with approval.
+Closed and committed 2026-11-05 (user approved). Next: step 09 (QEMU Cortex-M3) when the user decides.
 
 ## Environment facts that matter
 - Current host (since 2026-11-04): Docker container, 2 vCPU Xeon Platinum 8370C, Ubuntu 24.04.5. No effective

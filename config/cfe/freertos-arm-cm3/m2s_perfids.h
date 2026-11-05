@@ -1,0 +1,25 @@
+/*
+ * m2s_perfids.h — m2s-cfs mission performance IDs (cFE requires a <mission>_perfids.h; there is no default).
+ * The core IDs and the reserved exit bit use the same values as cFE's sample_defs.
+ */
+#ifndef M2S_PERFIDS_H
+#define M2S_PERFIDS_H
+
+#define CFE_MISSION_ES_PERF_EXIT_BIT 31 /* reserved by the perf utilities */
+
+#define CFE_MISSION_ES_MAIN_PERF_ID  1
+#define CFE_MISSION_EVS_MAIN_PERF_ID 2
+#define CFE_MISSION_TBL_MAIN_PERF_ID 3
+#define CFE_MISSION_SB_MAIN_PERF_ID  4
+
+#define CFE_MISSION_SB_MSG_LIM_PERF_ID    5
+#define CFE_MISSION_SB_PIPE_OFLOW_PERF_ID 27
+
+#define CFE_MISSION_TIME_MAIN_PERF_ID         6
+#define CFE_MISSION_TIME_TONE1HZISR_PERF_ID   7
+#define CFE_MISSION_TIME_LOCAL1HZISR_PERF_ID  8
+#define CFE_MISSION_TIME_SENDMET_PERF_ID      9
+#define CFE_MISSION_TIME_LOCAL1HZTASK_PERF_ID 10
+#define CFE_MISSION_TIME_TONE1HZTASK_PERF_ID  11
+
+#endif /* M2S_PERFIDS_H */

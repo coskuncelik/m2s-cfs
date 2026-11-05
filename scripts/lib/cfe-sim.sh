@@ -10,17 +10,19 @@
 #   mission    : config/cfe/freertos-posix-sim (base), optionally overlaid by config/cfe/<mission>; assembled
 #                in the build directory with m2s_paths.cmake and the embedded /cf image cf.tar (D29)
 #
-# Missions: freertos-posix-sim (flight: counter_app), freertos-posix-sim-ft (cFE functional tests).
+# Missions: freertos-posix-sim (flight: counter_app), freertos-posix-sim-ft (cFE functional tests),
+#           freertos-arm-cm3 (Cortex-M3 cross build, step 08; its own base).
 
-# $1 = mission name (directory under config/cfe/).
+# $1 = mission name (directory under config/cfe/); $2 = base mission config (default freertos-posix-sim).
 cfe_sim_init() {
     MISSION="$1"
+    local base="${2:-freertos-posix-sim}"
     ROOT_DIR="${M2S_CFS_ROOT:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
     CFS_DIR="${ROOT_DIR}/sources/cFS"
     KERNEL_DIR="${ROOT_DIR}/sources/FreeRTOS-Kernel"
     PSP_EXT_DIR="${ROOT_DIR}/psp-ext"
     APPS_DIR="${ROOT_DIR}/apps"
-    BASE_DEFS="${ROOT_DIR}/config/cfe/freertos-posix-sim"
+    BASE_DEFS="${ROOT_DIR}/config/cfe/${base}"
     OVERLAY_DEFS="${ROOT_DIR}/config/cfe/${MISSION}"
     [[ -d "${OVERLAY_DEFS}" ]] || die "mission config not found: ${OVERLAY_DEFS}"
     if [[ "${MISSION}" == "freertos-posix-sim" ]]; then
@@ -35,6 +37,11 @@ cfe_sim_init() {
     LOG_DIR="${ROOT_DIR}/logs"
     # Objects allowed to reference malloc/free: the FreeRTOS POSIX port, host-only.
     MALLOC_ALLOWED='/(port\.c|wait_for_event\.c)\.o$'
+    MALLOC_ALLOWED_TEXT="the host POSIX port"
+    # Binary tools and the cFE architecture directory (= toolchain name) of the target.
+    NM="nm"
+    SIZE="size"
+    ARCH_SUBDIR="${base}"
 }
 
 log() { printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"; }
@@ -105,16 +112,26 @@ cfe_sim_sources_status() {
     git -C "${KERNEL_DIR}" status --porcelain --ignore-submodules=none
 }
 
-# Fresh copy of the stock PSP tree plus the project platform and module (D27). Rebuilt every run so it
-# always matches sources/cFS/psp and psp-ext/; cp -a keeps timestamps, so unchanged files do not rebuild.
+# Fresh copy of the stock PSP tree plus every project platform and module in psp-ext/fsw (D27). Rebuilt
+# every run so it always matches sources/cFS/psp and psp-ext/; cp -a keeps timestamps, so unchanged
+# files do not rebuild.
 cfe_sim_assemble_psp_tree() {
+    local d name
     rm -rf "${PSP_TREE}"
     mkdir -p "${PSP_TREE}"
     cp -a "${CFS_DIR}/psp" "${PSP_TREE}/psp"
-    [[ ! -e "${PSP_TREE}/psp/fsw/freertos-posix-sim" ]] || die "stock PSP already has a freertos-posix-sim platform"
-    [[ ! -e "${PSP_TREE}/psp/fsw/modules/timebase_freertos" ]] || die "stock PSP already has a timebase_freertos module"
-    cp -a "${PSP_EXT_DIR}/fsw/freertos-posix-sim" "${PSP_TREE}/psp/fsw/"
-    cp -a "${PSP_EXT_DIR}/fsw/modules/timebase_freertos" "${PSP_TREE}/psp/fsw/modules/"
+    for d in "${PSP_EXT_DIR}"/fsw/*/ "${PSP_EXT_DIR}"/fsw/modules/*/; do
+        d="${d%/}"
+        name="${d##*/}"
+        [[ "${name}" == "modules" ]] && continue
+        if [[ "${d}" == */fsw/modules/* ]]; then
+            [[ ! -e "${PSP_TREE}/psp/fsw/modules/${name}" ]] || die "stock PSP already has a ${name} module"
+            cp -a "${d}" "${PSP_TREE}/psp/fsw/modules/"
+        else
+            [[ ! -e "${PSP_TREE}/psp/fsw/${name}" ]] || die "stock PSP already has a ${name} platform"
+            cp -a "${d}" "${PSP_TREE}/psp/fsw/"
+        fi
+    done
     log "OK   PSP tree assembled at ${PSP_TREE}/psp (stock PSP + psp-ext)"
 }
 
@@ -161,7 +178,7 @@ cfe_sim_build() {
 cfe_sim_check_static_only() {
     local bin="${EXE_DIR}/core-cpu1" obj bad=0 users=0 count=0 syms
     # nm output captured first: with pipefail, "nm | grep -q" can fail when grep exits early (SIGPIPE).
-    syms="$(nm "${bin}")"
+    syms="$("${NM}" "${bin}")"
     if grep -Eq '\b(pvPortMalloc|vPortFree|xTaskCreate|xQueueGenericCreate|xQueueCreateMutex|xQueueCreateCountingSemaphore|xTimerCreate|xEventGroupCreate)$' <<<"${syms}"; then
         die "core-cpu1: FreeRTOS heap or dynamic FreeRTOS object creation symbol found"
     fi
@@ -172,17 +189,18 @@ cfe_sim_check_static_only() {
     # Every target object (unit-test stubs and ut_assert are not linked into core-cpu1).
     while IFS= read -r obj; do
         count=$(( count + 1 ))
-        if grep -Eq '\b(malloc|free|calloc|realloc|posix_memalign|aligned_alloc)$' <<<"$(nm -u "${obj}" 2>/dev/null)"; then
+        if grep -Eq '\b(_?malloc(_r)?|_?free(_r)?|_?calloc(_r)?|_?realloc(_r)?|posix_memalign|aligned_alloc)$' <<<"$("${NM}" -u "${obj}" 2>/dev/null)"; then
             users=$(( users + 1 ))
             if [[ ! "${obj}" =~ ${MALLOC_ALLOWED} ]]; then
                 log "ERROR malloc/free referenced by ${obj#"${WORK_DIR}/"}"
                 bad=1
             fi
         fi
-    done < <(find "${WORK_DIR}/freertos-posix-sim" -name '*.o' -path '*CMakeFiles*' \
-                 ! -path '*ut-stubs*' ! -path '*ut_assert*' | sort)
-    (( count > 0 )) || die "no target objects found under ${WORK_DIR}/freertos-posix-sim"
-    (( bad == 0 )) || die "dynamic allocation outside the host POSIX port"
-    log "OK   malloc/free referenced only by the host POSIX port (${users} of ${count} objects: port.c, wait_for_event.c)"
-    log "     core-cpu1 sections: $(size "${bin}" | tail -1 | awk '{print "text=" $1 " data=" $2 " bss=" $3}')"
+    # Object suffix: .o with the host compiler, .obj with the Generic (bare-metal) CMake platform.
+    done < <(find "${WORK_DIR}/${ARCH_SUBDIR}" \( -name '*.o' -o -name '*.obj' \) -path '*CMakeFiles*' \
+                 ! -path '*ut-stubs*' ! -path '*ut_assert*' ! -path '*CompilerId*' | sort)
+    (( count > 0 )) || die "no target objects found under ${WORK_DIR}/${ARCH_SUBDIR}"
+    (( bad == 0 )) || die "dynamic allocation outside ${MALLOC_ALLOWED_TEXT}"
+    log "OK   malloc/free referenced only by ${MALLOC_ALLOWED_TEXT} (${users} of ${count} objects)"
+    log "     core-cpu1 sections: $("${SIZE}" "${bin}" | tail -1 | awk '{print "text=" $1 " data=" $2 " bss=" $3}')"
 }

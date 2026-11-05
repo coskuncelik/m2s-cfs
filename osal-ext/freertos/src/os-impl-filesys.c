@@ -317,7 +317,7 @@ int32 OS_FileSysStartVolume_Impl(const OS_object_token_t *token)
     }
     filesys->fstype = OS_FILESYS_TYPE_VOLATILE_DISK; /* every other volume is a RAM disk */
 
-    if (bytes == 0U || bytes > (uint64)SIZE_MAX || (uint64)filesys->blocksize > UINT32_MAX)
+    if (bytes == 0U || bytes > (uint64)SIZE_MAX || (size_t)(uint32)filesys->blocksize != filesys->blocksize)
     {
         return OS_FS_ERR_DRIVE_NOT_CREATED;
     }

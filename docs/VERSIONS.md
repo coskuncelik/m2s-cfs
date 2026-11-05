@@ -38,6 +38,17 @@ Resolved 2026-11-03.
 - The reference missions' nested submodules: their URLs use SSH (`git@github.com:`), and they are
   reference material only.
 
+## Host toolchain for the Cortex-M3 build (step 08)
+
+Installed by the user from Ubuntu 24.04 (noble/universe) on 2026-11-05; not pinned by script 00. Script 01
+reports it, script 08 logs the version it used.
+
+| Package | Version |
+|---|---|
+| `gcc-arm-none-eabi` | `15:13.2.rel1-2` (arm-none-eabi-gcc 13.2.1 20231009) |
+| `binutils-arm-none-eabi` | `2.42-1ubuntu1+23` |
+| `libnewlib-arm-none-eabi` | `4.4.0.20231231-2` (newlib-nano: `nano.specs`) |
+
 ## Notes
 
 - FreeRTOS `V11.3.3` (2026-10-30) exists. We are not using it (no upgrade without approval).

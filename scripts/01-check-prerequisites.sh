@@ -6,7 +6,9 @@
 #
 #   REQUIRED : needed for the current phases (native-POSIX baseline, FreeRTOS Linux simulator).
 #              Any missing or too-old REQUIRED tool -> exit 1.
-#   FUTURE   : needed later for the SmartFusion2 hardware phases. Reported only, never fails.
+#   CM3      : Cortex-M3 cross build (step 08 onwards): arm-none-eabi gcc and binutils, newlib-nano.
+#              Reported with the apt command, never fails here (script 08 fails if they are missing).
+#   FUTURE   : needed later (emulator, JTAG). Reported only, never fails.
 #
 # Usage: ./scripts/01-check-prerequisites.sh
 set -euo pipefail
@@ -27,14 +29,18 @@ REQUIRED=(
     "cmake|cmake|cFE/OSAL/PSP build system"
     "xxd|xxd|cFE EMBED_FILELIST (embedded startup script)"
 )
-FUTURE=(
+CM3=(
     "arm-none-eabi-gcc|gcc-arm-none-eabi|Cortex-M3 cross compiler"
-    "arm-none-eabi-objcopy|binutils-arm-none-eabi|image conversion"
+    "arm-none-eabi-objcopy|binutils-arm-none-eabi|Cortex-M3 binutils (objcopy, nm, size, readelf)"
+)
+FUTURE=(
+    "qemu-system-arm|qemu-system-arm|Cortex-M3 emulator (step 09)"
     "gdb-multiarch|gdb-multiarch|JTAG debugging (or arm-none-eabi-gdb)"
     "openocd|openocd|JTAG server (Microchip build may be needed for FlashPro)"
 )
 
 MISSING_REQUIRED=()
+MISSING_CM3=()
 MISSING_FUTURE=()
 
 log() { printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"; }
@@ -57,6 +63,26 @@ check_tool() {
     fi
     log "MISSING [${level}] ${tool} — ${purpose} (apt: ${pkg})"
     return 1
+}
+
+# newlib-nano has no command of its own: ask the cross compiler for its spec file.
+check_newlib_nano() {
+    command -v arm-none-eabi-gcc >/dev/null 2>&1 || { MISSING_CM3+=("libnewlib-arm-none-eabi"); return 0; }
+    local spec
+    spec="$(arm-none-eabi-gcc -print-file-name=nano.specs 2>/dev/null || true)"
+    if [[ "${spec}" == /* && -f "${spec}" ]]; then
+        log "OK      [CM3] newlib-nano -> ${spec}"
+    else
+        log "MISSING [CM3] newlib-nano (nano.specs) — C library for the Cortex-M3 build (apt: libnewlib-arm-none-eabi)"
+        MISSING_CM3+=("libnewlib-arm-none-eabi")
+    fi
+}
+
+# apt needs a package index; on a fresh container /var/lib/apt/lists is empty.
+apt_prefix() {
+    if [[ -z "$(ls -A /var/lib/apt/lists 2>/dev/null | grep -v '^lock$\|^partial$' || true)" ]]; then
+        printf 'sudo apt update && '
+    fi
 }
 
 check_cmake_version() {
@@ -87,14 +113,26 @@ main() {
     done
     check_cmake_version
 
+    for entry in "${CM3[@]}"; do
+        IFS='|' read -r tool pkg purpose <<<"${entry}"
+        check_tool "CM3" "${tool}" "${pkg}" "${purpose}" || MISSING_CM3+=("${pkg}")
+    done
+    check_newlib_nano
+
     for entry in "${FUTURE[@]}"; do
         IFS='|' read -r tool pkg purpose <<<"${entry}"
         check_tool "FUTURE" "${tool}" "${pkg}" "${purpose}" || MISSING_FUTURE+=("${pkg}")
     done
 
+    if (( ${#MISSING_CM3[@]} > 0 )); then
+        local cm3
+        cm3="$(printf '%s\n' "${MISSING_CM3[@]}" | awk '!seen[$0]++' | tr '\n' ' ')"
+        log "NOTE    Cortex-M3 build tools missing (needed from step 08 on):"
+        log "        $(apt_prefix)sudo apt install ${cm3% }"
+    fi
     if (( ${#MISSING_FUTURE[@]} > 0 )); then
-        log "NOTE    FUTURE tools missing (not needed yet; toolchain choice still to be decided):"
-        log "        sudo apt install ${MISSING_FUTURE[*]}"
+        log "NOTE    FUTURE tools missing (not needed yet):"
+        log "        $(apt_prefix)sudo apt install ${MISSING_FUTURE[*]}"
     fi
 
     if (( ${#MISSING_REQUIRED[@]} > 0 )); then
@@ -102,7 +140,7 @@ main() {
         local uniq
         uniq="$(printf '%s\n' "${MISSING_REQUIRED[@]}" | awk '!seen[$0]++' | tr '\n' ' ')"
         log "ACTION  install the missing REQUIRED packages yourself, then re-run this script:"
-        log "        sudo apt install ${uniq% }"
+        log "        $(apt_prefix)sudo apt install ${uniq% }"
         log "=== 01-check-prerequisites FAILED ==="
         exit 1
     fi

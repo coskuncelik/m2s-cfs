@@ -2,7 +2,8 @@
 
 How the pinned NASA cFE and OSAL run on FreeRTOS V11.3.2 in this project. Current scope: steps 04a (OSAL core
 layer and the Linux simulator BSP), 04b (static RAM file system), 04c (all OSAL functional tests) and 05 (PSP and
-cFE core on the simulator), 05b (cFE's functional tests), 06 (`counter_app`) and 07 (shareable bundle). The SmartFusion2 BSP/PSP do not exist yet. Decisions are in `DECISIONS.md`.
+cFE core on the simulator), 05b (cFE's functional tests), 06 (`counter_app`), 07 (shareable bundle) and 08 (Cortex-M3 cross-build on a placeholder board). The SmartFusion2
+board files do not exist yet (D7). Decisions are in `DECISIONS.md`.
 
 ## Layers
 
@@ -30,8 +31,8 @@ cFE core on the simulator), 05b (cFE's functional tests), 06 (`counter_app`) and
  Linux host (pthreads, signals)     simulator only
 ```
 
-The planned SmartFusion2 target keeps the top three layers, replaces the BSP with a board BSP, and uses the
-`GCC/ARM_CM3` port instead of the POSIX port.
+The Cortex-M3 build (step 08) keeps the top layers, replaces the BSP and PSP platform with `freertos-arm-cm3`, and
+uses the `GCC/ARM_CM3` port instead of the POSIX port; see "Cortex-M3 build" below.
 
 ## How OSAL finds the project code
 
@@ -139,13 +140,39 @@ The kernel helper takes its kernel, config and patch locations from `M2S_FREERTO
 in the bundle, and this repository uses the defaults. `export/sample_defs` must be kept in step with
 `config/cfe/freertos-posix-sim` by hand; script `07-check-bundle.sh` builds and runs the bundle to catch drift.
 
+## Cortex-M3 build (step 08, D31)
+
+```
+ counter_app, cFE, OSAL shared + OS layer "freertos"   same sources as the simulator
+ cFE PSP "freertos-arm-cm3"     psp-ext/fsw/freertos-arm-cm3: simulator PSP sources + cfe_psp_support.c
+                                (reset through SCB AIRCR, panic halts)
+ OSAL BSP "freertos-arm-cm3"    osal-ext/freertos-arm-cm3: main(), unbuffered stdout, BSP_MAIN static task,
+                                console -> M2S_Board_ConsoleWrite, assert / stack-overflow hooks halt
+ board folder (M2S_BOARD_DIR)   m2s_board.h, startup_cm3.c (vector table, Reset_Handler), board.ld,
+                                board.c (console, clock), syscalls.c (newlib stubs, allocator and _sbrk traps)
+ FreeRTOS GCC/ARM_CM3 port      unmodified; config/freertos/arm_cm3/FreeRTOSConfig.h; no FreeRTOS heap
+```
+
+- Mission `config/cfe/freertos-arm-cm3` (toolchain `arm-none-eabi-gcc`, newlib-nano, `Generic` platform). Script
+  `08-build-cfe-arm-cm3.sh` builds it with the same script library as the simulator (`scripts/lib/cfe-sim.sh`,
+  mission base and binutils as parameters).
+- The board is `boards/link-check`, a PLACEHOLDER: generic Cortex-M3 start-up, invented memory map (16 MiB code at
+  0, 64 MiB RAM at `0x20000000`), placeholder clock and NVIC priority bits, console that discards output. The
+  SmartFusion2 board folder replaces it once the board sources exist (D7).
+- No heap at link time: the board defines `malloc`/`free`/`calloc`/`realloc` and their newlib `_r` forms as traps;
+  the toolchain's `-u` options make the linker take them from the board library before the C library, so
+  newlib-nano's allocator (referenced by its printf core and stdio) is never linked and `_sbrk` is discarded.
+- Memory sizes are still the simulator's (bss about 7.6 MB, mostly PSP reserved memory 4 MiB, OSAL RAM pool
+  1 MiB, cFE table and SB globals, OSAL queue table); they must be cut to the board's RAM later.
+
 ## Host-side versus embedded memory
 
 On the simulator, the FreeRTOS POSIX port allocates its per-thread bookkeeping with glibc `malloc` and runs each
 task on a host pthread stack; OSAL's test harness (`ut_assert`) also uses `malloc`. These are host-only. The OS
 layer, the BSP, OSAL's shared layer, the PSP and cFE do not reference `malloc`/`free` (step 05 checks every object
-linked into `core-cpu1`). The Cortex-M3 image will need its own
-evidence (link map, `malloc`/`_sbrk` trap), which does not exist yet.
+linked into `core-cpu1`). The Cortex-M3 image has its own evidence (step 08): no target object references an
+allocator, newlib's allocator objects are absent from the link map, and the allocator entry points exist only as
+the board's traps.
 
 ## Simulator limitations
 
