@@ -2,12 +2,12 @@
 
 How the pinned NASA cFE and OSAL run on FreeRTOS V11.3.2 in this project. Current scope: steps 04a (OSAL core
 layer and the Linux simulator BSP), 04b (static RAM file system), 04c (all OSAL functional tests) and 05 (PSP and
-cFE core on the simulator, no apps). The SmartFusion2 BSP/PSP do not exist yet. Decisions are in `DECISIONS.md`.
+cFE core on the simulator) and 06 (`counter_app`). The SmartFusion2 BSP/PSP do not exist yet. Decisions are in `DECISIONS.md`.
 
 ## Layers
 
 ```
- application / OSAL tests           (later: counter_app)
+ counter_app / OSAL tests           apps/counter_app (static, D28)      project code
  ───────────────────────────────────────────────────────────────
  cFE core (ES, EVS, SB, TBL, TIME)  sources/cFS/cfe                     pinned, unmodified
  ───────────────────────────────────────────────────────────────
@@ -94,6 +94,16 @@ compile flags.
 | Restart, panic | `cfe_psp_support.c` | End the simulator process. |
 | Watchdog, exceptions, SSR | `cfe_psp_watchdog.c`, `cfe_psp_exception.c`, `cfe_psp_ssr.c` | Stubs (none on the simulator). |
 | Stock modules | `soft_timebase`, `eeprom_notimpl`, `ram_direct`, `port_notimpl`, `iodriver` | Unchanged. |
+
+## Applications (step 06)
+
+Apps are linked into `core-cpu1` (the dynamic loader is off): `cpu1_STATIC_APPLIST counter_app`, and
+`cpu1_STATIC_SYMLIST "COUNTER_APP_Main,COUNTER_APP"` makes cFE generate OSAL's static symbol table. ES reads the
+startup script line `CFE_APP, counter_app, COUNTER_APP_Main, COUNTER_APP, 50, 16384, 0x0, 0;`, calls
+`OS_ModuleLoad` with the cFE name `COUNTER_APP` (found in the static table) and looks up the entry point there.
+`counter_app` uses only cFE/OSAL APIs and prints with `OS_printf`, which goes OSAL console → BSP → terminal (UART on
+the board). Its 1 s period follows fixed deadlines from `OS_GetLocalTime` (D28). Scripts 05 and 06 share the build
+steps in `scripts/lib/cfe-sim.sh`; `apps/` is on cFE's module search path (`CFS_APP_PATH`).
 
 ## Host-side versus embedded memory
 

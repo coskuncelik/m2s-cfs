@@ -1,5 +1,8 @@
+CFE_APP, counter_app, COUNTER_APP_Main, COUNTER_APP, 50, 16384, 0x0, 0;
 !
-! m2s-cfs cFE startup script for cpu1 (step 05): no applications yet.
+! m2s-cfs cFE startup script for cpu1.
 ! Embedded in core-cpu1 (cpu1_EMBED_FILELIST) and written to /cf/cfe_es_startup.scr by the PSP (D5).
 ! cFE stops parsing at the first '!'.
+! Fields: type, file name (unused for static apps), entry point, cFE name (= static module name),
+!         priority, stack size, load address, exception action.
 !

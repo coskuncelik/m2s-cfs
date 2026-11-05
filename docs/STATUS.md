@@ -14,7 +14,8 @@ Last updated: 2026-11-04. Read this first when resuming. Rules: `CLAUDE.md`. Dec
 | **04b static RAM file system (D19, D25)** | **closed 2026-11-04 (user approved)** | `docs/test-results/04b-ramfs-sim.md` |
 | **04c full OSAL functional test set (D26)** | **closed 2026-11-04 (user approved)** | `docs/test-results/04c-osal-unit-tests-sim.md` |
 | **05 PSP and cFE core on the simulator (D27)** | **closed 2026-11-04 (user approved)** | `docs/test-results/05-cfe-freertos-sim.md` |
-| 05b cFE functional tests, counter_app, SmartFusion2 target | not planned in detail yet | — |
+| **06 counter_app on the simulator (D28)** | **closed 2026-11-05 (user approved)** | `docs/test-results/06-counter-app-sim.md` |
+| 05b cFE functional tests, SmartFusion2 target | not planned in detail yet | — |
 
 ## 04a: where it stands
 
@@ -72,8 +73,15 @@ Plan approved 2026-11-04 (recommendations: build-time PSP copy, own `timebase_fr
 script now, cFE functional tests later in 05b). `./scripts/05-build-cfe-freertos-sim.sh --clean` exit 0: stock
 cFE core (no apps) builds on the FreeRTOS OSAL with the project PSP, reaches OPERATIONAL with the embedded startup
 script, 5/5 runs of 20 s; no `malloc`/`free` outside the host POSIX port. Steps 03 and 04 re-run after the kernel
-CMake change (`_GNU_SOURCE=`). Closed and committed 2026-11-04 (user approved). Next (when resuming): choose
-05b (cFE functional tests) or `counter_app`; each needs its own plan and approval.
+CMake change (`_GNU_SOURCE=`). Closed and committed 2026-11-04 (user approved).
+
+## 06: result
+
+Plan approved 2026-11-05; user chose `OS_printf` for output (D28 updates D6). `./scripts/06-run-counter-app-sim.sh
+--clean` exit 0: counter_app linked statically, started by the embedded script, prints "counter_app initialized"
+and "counter_app counter: N" once per second; 5/5 runs, 19 counts each, drift under 30 µs over 18 s. A plain
+`OS_TaskDelay(1000)` drifted 1 ms/s; the app now uses fixed deadlines. Scripts 05 (5/5) and 04 (75/75) re-run.
+Closed and committed 2026-11-05 (user approved). Next: 05b (cFE functional tests), plan requested by the user.
 
 ## Environment facts that matter
 - Current host (since 2026-11-04): Docker container, 2 vCPU Xeon Platinum 8370C, Ubuntu 24.04.5. No effective
