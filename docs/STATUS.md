@@ -16,6 +16,7 @@ Last updated: 2026-11-05. Read this first when resuming. Rules: `CLAUDE.md`. Dec
 | **05 PSP and cFE core on the simulator (D27)** | **closed 2026-11-04 (user approved)** | `docs/test-results/05-cfe-freertos-sim.md` |
 | **06 counter_app on the simulator (D28)** | **closed 2026-11-05 (user approved)** | `docs/test-results/06-counter-app-sim.md` |
 | **05b cFE functional tests on the simulator (D29)** | **closed 2026-11-05 (user approved)** | `docs/test-results/05b-cfe-functional-tests-sim.md` |
+| **07 shareable bundle `cfs-m2s-freertos` (D30)** | **closed 2026-11-05 (user approved); bundle not published yet** | `docs/test-results/07-export-bundle.md` |
 | SmartFusion2 target | not planned in detail yet (blocked by D7) | — |
 
 ## 04a: where it stands
@@ -91,6 +92,16 @@ new tolerances). `./scripts/05b-run-cfe-functional-tests-sim.sh --clean`: native
 FreeRTOS 3 rounds identical, every assertion equal to native except `FAIL es_task_test.c:108` (approved, D29).
 Fixed on the way: static-only link order, wrong `OS_Application_Startup` linked, `nm | grep -q` under pipefail in
 scripts 03/04/05/06. Closed and committed 2026-11-05 (user approved). Next: plan the next step with the user (SmartFusion2 target needs D7 sources).
+
+## 07: result
+
+Plan approved 2026-11-05 (option A: generated bundle in the stock cFS layout; name `cfs-m2s-freertos`; "m2s" kept
+in names; Apache-2.0 for our code; simulator + counter_app only; publish later as a GitHub repository).
+`./scripts/07-check-bundle.sh` exit 0: reproducible tree, 3149 upstream files byte-identical, no private
+references, a fresh clone builds with stock `make prep && make && make install`, static-memory check, counter_app
+5/5. Regression 06/05/03/04 pass. Fixed on the way: `tables/staging` removed by cFE's `prepare()` (deferred mkdir,
+CMake >= 3.19). Closed and committed 2026-11-05 (user approved). Next: push the bundle to the GitHub
+repository https://github.com/coskuncelik/cfs-m2s-freertos (address given by the user).
 
 ## Environment facts that matter
 - Current host (since 2026-11-04): Docker container, 2 vCPU Xeon Platinum 8370C, Ubuntu 24.04.5. No effective

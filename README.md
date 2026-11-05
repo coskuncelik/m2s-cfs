@@ -16,6 +16,8 @@ NASA cFS/cFE on FreeRTOS Kernel V11.3.2, targeting:
 ./scripts/05-build-cfe-freertos-sim.sh --clean  # stock cFE core on FreeRTOS with the project PSP, 5 runs of 20 s
 ./scripts/05b-run-cfe-functional-tests-sim.sh --clean # cFE's functional tests on FreeRTOS, compared assertion by assertion with stock cFE on native Linux
 ./scripts/06-run-counter-app-sim.sh --clean     # counter_app on the simulator: start-up message + 1 Hz counter, 5 runs of 20 s
+./scripts/07-export-bundle.sh   # generate the shareable bundle build/export/cfs-m2s-freertos (stock cFS layout, no project history)
+./scripts/07-check-bundle.sh    # verify it: reproducible, upstream files unchanged, no private references, fresh clone builds and runs counter_app
 ```
 
 ## Documentation
@@ -39,4 +41,5 @@ functional test programs run, failing only on documented simulator limits and fe
 with a project PSP, from static memory only (`docs/test-results/05-cfe-freertos-sim.md`), cFE's own functional tests give the same
 result as stock cFE on native Linux except one simulator-only assertion (`docs/test-results/05b-cfe-functional-tests-sim.md`),
 and `counter_app` prints its start-up message and a counter every second (`docs/test-results/06-counter-app-sim.md`). The SmartFusion2
-target is not done yet.
+target is not done yet. `scripts/07-export-bundle.sh` generates the shareable bundle `cfs-m2s-freertos` for the
+team (`docs/test-results/07-export-bundle.md`); `export/` holds the files that exist only in the bundle.

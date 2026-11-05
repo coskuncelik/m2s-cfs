@@ -7,11 +7,21 @@
 # build directory; sources/ is never modified) and the project hooks. No portable/MemMang/heap_*.c:
 # static allocation only. Include directories and Threads are PUBLIC.
 
+#
+# Locations: M2S_FREERTOS_DIR (kernel tree), M2S_FREERTOS_CONFIG_DIR (FreeRTOSConfig.h and hooks) and
+# M2S_FREERTOS_PORT_PATCH may be set before including this file; the defaults are this repository's layout.
+
 get_filename_component(M2S_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
-set(M2S_FREERTOS_DIR "${M2S_ROOT}/sources/FreeRTOS-Kernel")
-set(M2S_FREERTOS_CONFIG_DIR "${M2S_ROOT}/config/freertos/posix")
+if(NOT DEFINED M2S_FREERTOS_DIR)
+    set(M2S_FREERTOS_DIR "${M2S_ROOT}/sources/FreeRTOS-Kernel")
+endif()
+if(NOT DEFINED M2S_FREERTOS_CONFIG_DIR)
+    set(M2S_FREERTOS_CONFIG_DIR "${M2S_ROOT}/config/freertos/posix")
+endif()
+if(NOT DEFINED M2S_FREERTOS_PORT_PATCH)
+    set(M2S_FREERTOS_PORT_PATCH "${M2S_ROOT}/patches/freertos-kernel/0001-posix-port-tick-catch-up.patch")
+endif()
 set(M2S_FREERTOS_PORT_DIR "${M2S_FREERTOS_DIR}/portable/ThirdParty/GCC/Posix")
-set(M2S_FREERTOS_PORT_PATCH "${M2S_ROOT}/patches/freertos-kernel/0001-posix-port-tick-catch-up.patch")
 
 function(m2s_add_freertos_posix_kernel TARGET)
     cmake_parse_arguments(ARG "" "" "EXTRA_SOURCES" ${ARGN})

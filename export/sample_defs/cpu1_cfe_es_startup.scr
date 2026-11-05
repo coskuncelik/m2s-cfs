@@ -1,0 +1,8 @@
+CFE_APP, counter_app, COUNTER_APP_Main, COUNTER_APP, 50, 16384, 0x0, 0;
+!
+! cfs-m2s-freertos cFE startup script for cpu1.
+! Packed into the embedded /cf image (cf.tar, see mission_build_custom.cmake) and unpacked to
+! /cf/cfe_es_startup.scr by the PSP. cFE stops parsing at the first '!'.
+! Fields: type, file name (unused for static apps), entry point, cFE name (= static module name),
+!         priority, stack size, load address, exception action.
+!

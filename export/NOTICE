@@ -1,0 +1,16 @@
+cfs-m2s-freertos
+================
+
+This bundle combines:
+
+1. NASA core Flight System (cFS bundle with cFE, OSAL, PSP, apps, libs and tools) — Apache License 2.0,
+   see LICENSE and the LICENSE files in each component. Copyright United States Government as represented
+   by the Administrator of the National Aeronautics and Space Administration. Unmodified, except for the
+   files listed under "Changed upstream files" in PORTING.md.
+
+2. FreeRTOS-Kernel V11.3.2 (FreeRTOS-Kernel/) — MIT License, see FreeRTOS-Kernel/LICENSE.md.
+   Copyright Amazon.com, Inc. or its affiliates. Unmodified; the POSIX port's port.c is patched into a
+   copy in the build directory (osal/src/bsp/freertos-posix-sim/patches/).
+
+3. The FreeRTOS port (the files listed under "Added files" in PORTING.md) — Apache License 2.0
+   (http://www.apache.org/licenses/LICENSE-2.0). Copyright the cfs-m2s-freertos contributors.

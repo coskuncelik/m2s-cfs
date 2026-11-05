@@ -2,7 +2,7 @@
 
 How the pinned NASA cFE and OSAL run on FreeRTOS V11.3.2 in this project. Current scope: steps 04a (OSAL core
 layer and the Linux simulator BSP), 04b (static RAM file system), 04c (all OSAL functional tests) and 05 (PSP and
-cFE core on the simulator), 05b (cFE's functional tests) and 06 (`counter_app`). The SmartFusion2 BSP/PSP do not exist yet. Decisions are in `DECISIONS.md`.
+cFE core on the simulator), 05b (cFE's functional tests), 06 (`counter_app`) and 07 (shareable bundle). The SmartFusion2 BSP/PSP do not exist yet. Decisions are in `DECISIONS.md`.
 
 ## Layers
 
@@ -121,6 +121,23 @@ Mission `freertos-posix-sim-ft` links cFE's `cfe_assert` and `cfe_testcase`, NAS
 (the tests share its table) and the test-only `apps/ft_logdump` statically; its `/cf` root volume is 1 MiB for the
 test log. After the tests, `ft_logdump` prints `/cf/cfe_test.log` as `FTLOG|`/`FTLOG+` lines; script 05b rebuilds the
 file, checks its size, and compares every assertion with stock cFE run natively with the same apps (D29).
+
+## Shareable bundle (step 07)
+
+`scripts/07-export-bundle.sh` generates `cfs-m2s-freertos` (D30), a copy in the stock cFS bundle layout:
+
+| Here | In the bundle |
+|---|---|
+| `osal-ext/freertos` | `osal/src/os/freertos` |
+| `osal-ext/freertos-posix-sim` + `cmake/freertos-posix-kernel.cmake`, `config/freertos/posix/*`, patch 0001 | `osal/src/bsp/freertos-posix-sim` (+ `cmake/`, `config/`, `patches/`) |
+| `psp-ext/fsw/freertos-posix-sim`, `psp-ext/fsw/modules/timebase_freertos` | `psp/fsw/...` |
+| `apps/counter_app` | `apps/counter_app` |
+| `config/cfe/freertos-posix-sim` (via the scripts) | `sample_defs/` (from `export/sample_defs`; `cf.tar` built by `mission_build_custom.cmake`) |
+| `sources/cFS`, `sources/FreeRTOS-Kernel` | top level, `FreeRTOS-Kernel/` |
+
+The kernel helper takes its kernel, config and patch locations from `M2S_FREERTOS_*` variables; the BSP sets them
+in the bundle, and this repository uses the defaults. `export/sample_defs` must be kept in step with
+`config/cfe/freertos-posix-sim` by hand; script `07-check-bundle.sh` builds and runs the bundle to catch drift.
 
 ## Host-side versus embedded memory
 
