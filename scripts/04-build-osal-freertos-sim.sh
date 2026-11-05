@@ -139,7 +139,8 @@ check_static_only() {
         bin="${BUILD_DIR}/${t}"
         [[ -x "${bin}" ]] || die "test binary missing: ${bin}"
         # FreeRTOS heap or dynamic object creation must not be present at all.
-        if nm "${bin}" | grep -Eq '\b(pvPortMalloc|vPortFree|xTaskCreate|xQueueGenericCreate|xQueueCreateMutex|xQueueCreateCountingSemaphore|xTimerCreate|xEventGroupCreate)$'; then
+        # nm output captured first: with pipefail, "nm | grep -q" can fail when grep exits early (SIGPIPE).
+        if grep -Eq '\b(pvPortMalloc|vPortFree|xTaskCreate|xQueueGenericCreate|xQueueCreateMutex|xQueueCreateCountingSemaphore|xTimerCreate|xEventGroupCreate)$' <<<"$(nm "${bin}")"; then
             log "ERROR ${t}: dynamic FreeRTOS allocation symbol found"
             bad=1
         fi

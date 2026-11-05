@@ -91,7 +91,8 @@ check_no_heap() {
     if grep -Eq 'heap_[1-5]\.c|heap_[1-5]\.o|pvPortMalloc|vPortFree' "${MAP}"; then
         die "FreeRTOS heap found in link map ${MAP}"
     fi
-    if nm "${BIN}" | grep -Eq '\b(pvPortMalloc|vPortFree|xPortGetFreeHeapSize)\b'; then
+    # nm output captured first: with pipefail, "nm | grep -q" can fail when grep exits early (SIGPIPE).
+    if grep -Eq '\b(pvPortMalloc|vPortFree|xPortGetFreeHeapSize)\b' <<<"$(nm "${BIN}")"; then
         die "FreeRTOS heap symbol found in ${BIN}"
     fi
     log "OK   no FreeRTOS heap (heap_*.c, pvPortMalloc, vPortFree) in link map or symbols"

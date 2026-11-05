@@ -18,7 +18,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/cfe-sim.sh
 source "${SCRIPT_DIR}/lib/cfe-sim.sh"
-cfe_sim_init
+cfe_sim_init freertos-posix-sim
 LOG_FILE="${LOG_DIR}/05-build-cfe-freertos-sim.log"
 RUN_DIR="${LOG_DIR}/05-cfe-runs"
 RUNS="${RUNS:-5}"
@@ -26,7 +26,7 @@ RUN_SECONDS="${RUN_SECONDS:-20}"
 
 # Every one of these must appear in each run log (fixed strings).
 EXPECTED_LINES=(
-    "CFE_PSP: embedded startup script installed as /cf/cfe_es_startup.scr"
+    "CFE_PSP: /cf image installed: 1 file(s), 0 director(ies)"
     "CFE_PSP: using the FreeRTOS tick (1000 Hz) as CFE timebase"
     "POWER ON RESET due to Power Cycle"
     "cFE EVS Initialized"

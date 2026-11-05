@@ -1,6 +1,6 @@
 # Project status
 
-Last updated: 2026-11-04. Read this first when resuming. Rules: `CLAUDE.md`. Decisions: `docs/DECISIONS.md`.
+Last updated: 2026-11-05. Read this first when resuming. Rules: `CLAUDE.md`. Decisions: `docs/DECISIONS.md`.
 
 ## Steps
 
@@ -15,7 +15,8 @@ Last updated: 2026-11-04. Read this first when resuming. Rules: `CLAUDE.md`. Dec
 | **04c full OSAL functional test set (D26)** | **closed 2026-11-04 (user approved)** | `docs/test-results/04c-osal-unit-tests-sim.md` |
 | **05 PSP and cFE core on the simulator (D27)** | **closed 2026-11-04 (user approved)** | `docs/test-results/05-cfe-freertos-sim.md` |
 | **06 counter_app on the simulator (D28)** | **closed 2026-11-05 (user approved)** | `docs/test-results/06-counter-app-sim.md` |
-| 05b cFE functional tests, SmartFusion2 target | not planned in detail yet | — |
+| **05b cFE functional tests on the simulator (D29)** | **closed 2026-11-05 (user approved)** | `docs/test-results/05b-cfe-functional-tests-sim.md` |
+| SmartFusion2 target | not planned in detail yet (blocked by D7) | — |
 
 ## 04a: where it stands
 
@@ -81,7 +82,15 @@ Plan approved 2026-11-05; user chose `OS_printf` for output (D28 updates D6). `.
 --clean` exit 0: counter_app linked statically, started by the embedded script, prints "counter_app initialized"
 and "counter_app counter: N" once per second; 5/5 runs, 19 counts each, drift under 30 µs over 18 s. A plain
 `OS_TaskDelay(1000)` drifted 1 ms/s; the app now uses fixed deadlines. Scripts 05 (5/5) and 04 (75/75) re-run.
-Closed and committed 2026-11-05 (user approved). Next: 05b (cFE functional tests), plan requested by the user.
+Closed and committed 2026-11-05 (user approved).
+
+## 05b: result
+
+Plan approved 2026-11-05 (recommendations: native reference, `/cf` tar image, separate test mission, stop before
+new tolerances). `./scripts/05b-run-cfe-functional-tests-sim.sh --clean`: native 2521 assertions, 2044 PASS, 0 FAIL;
+FreeRTOS 3 rounds identical, every assertion equal to native except `FAIL es_task_test.c:108` (approved, D29).
+Fixed on the way: static-only link order, wrong `OS_Application_Startup` linked, `nm | grep -q` under pipefail in
+scripts 03/04/05/06. Closed and committed 2026-11-05 (user approved). Next: plan the next step with the user (SmartFusion2 target needs D7 sources).
 
 ## Environment facts that matter
 - Current host (since 2026-11-04): Docker container, 2 vCPU Xeon Platinum 8370C, Ubuntu 24.04.5. No effective

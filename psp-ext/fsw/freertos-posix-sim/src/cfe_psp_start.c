@@ -3,10 +3,11 @@
  *
  * The OSAL BSP (osal-ext/freertos-posix-sim) starts the FreeRTOS scheduler and calls
  * OS_Application_Startup() and then OS_Application_Run() from its static BSP_MAIN task.
- * Start-up: OSAL init -> reserved memory map -> /cf fixed map -> embedded startup script into /cf (D5)
+ * Start-up: OSAL init -> reserved memory map -> /cf fixed map -> embedded /cf image unpacked (D5, D29)
  * -> PSP modules -> cFE (CFE_ES_Main). Every start is a power-on reset (static memory does not survive
  * the host process).
  */
+#include <stdio.h>
 #include <string.h>
 
 #include "common_types.h"
@@ -21,38 +22,168 @@
 #define CFE_PSP_NONVOL_STARTUP_FILE (GLOBAL_CONFIGDATA.CfeConfig->NonvolStartupFile)
 
 /*
- * Embedded startup script (targets.cmake: <cpu>_EMBED_FILELIST "CFE_ES_STARTUP_SCR,cfe_es_startup.scr").
- * Every mission using this PSP must embed it (D5): a missing script is a link error, not a silent start
- * without apps. (Weak references would not pull the data out of cFE's static embed library.)
+ * Embedded /cf image (D5, D29): a POSIX ustar archive built by the mission scripts from the startup script
+ * and any table files, embedded with <cpu>_EMBED_FILELIST "CFE_PSP_CF_IMAGE,cf.tar". Every mission using
+ * this PSP must embed it: a missing image is a link error, not a silent start without apps.
  */
-extern const char          CFE_ES_STARTUP_SCR_DATA[];
-extern const unsigned long CFE_ES_STARTUP_SCR_SIZE;
+extern const char          CFE_PSP_CF_IMAGE_DATA[];
+extern const unsigned long CFE_PSP_CF_IMAGE_SIZE;
 
-/* Copies the embedded startup script to /cf. A failure is reported; cFE then starts without apps. */
-static void CFE_PSP_InstallStartupScript(void)
+#define CFE_PSP_TAR_BLOCK 512U
+
+/* Parses an octal tar header field; returns false on a non-octal character. */
+static bool CFE_PSP_TarOctal(const char *field, size_t len, unsigned long *value)
+{
+    size_t i;
+
+    *value = 0;
+    for (i = 0; i < len && field[i] != '\0' && field[i] != ' '; ++i)
+    {
+        if (field[i] < '0' || field[i] > '7')
+        {
+            return false;
+        }
+        *value = (*value << 3) + (unsigned long)(field[i] - '0');
+    }
+    return true;
+}
+
+/* Length of a tar header string field (not necessarily NUL-terminated). */
+static size_t CFE_PSP_TarFieldLen(const char *field, size_t max)
+{
+    size_t n = 0;
+
+    while (n < max && field[n] != '\0')
+    {
+        ++n;
+    }
+    return n;
+}
+
+/*
+ * Builds "/cf/<prefix>/<name>" from a header. Returns 1 for a usable path, 0 for the archive root ("." or "./",
+ * which is /cf itself and is skipped), -1 for an absolute path, "..", or a name that does not fit.
+ */
+static int CFE_PSP_TarPath(const char *hdr, char *path, size_t size)
+{
+    char        name[155 + 1 + 100 + 1]; /* ustar prefix + '/' + name + NUL */
+    const char *rel;
+    size_t      pos = 0;
+    size_t      n;
+
+    n = CFE_PSP_TarFieldLen(&hdr[345], 155); /* ustar prefix */
+    if (n > 0)
+    {
+        memcpy(name, &hdr[345], n);
+        pos         = n;
+        name[pos++] = '/';
+    }
+    n = CFE_PSP_TarFieldLen(hdr, 100);
+    memcpy(&name[pos], hdr, n);
+    pos += n;
+    name[pos] = '\0';
+
+    while (pos > 0 && name[pos - 1] == '/') /* directories end in '/' */
+    {
+        name[--pos] = '\0';
+    }
+    rel = name;
+    while (strncmp(rel, "./", 2) == 0)
+    {
+        rel += 2;
+    }
+    if (rel[0] == '\0' || strcmp(rel, ".") == 0)
+    {
+        return 0;
+    }
+    if (rel[0] == '/' || strstr(rel, "..") != NULL)
+    {
+        return -1;
+    }
+    n = (size_t)snprintf(path, size, "/cf/%s", rel);
+    return (n < size) ? 1 : -1;
+}
+
+static int32 CFE_PSP_WriteCfFile(const char *path, const char *data, unsigned long size)
 {
     osal_id_t fd;
     int32     status;
 
-    status = OS_OpenCreate(&fd, CFE_PSP_FREERTOS_STARTUP_SCRIPT, OS_FILE_FLAG_CREATE | OS_FILE_FLAG_TRUNCATE,
-                           OS_WRITE_ONLY);
+    status = OS_OpenCreate(&fd, path, OS_FILE_FLAG_CREATE | OS_FILE_FLAG_TRUNCATE, OS_WRITE_ONLY);
     if (status != OS_SUCCESS)
     {
-        OS_printf("CFE_PSP: cannot create %s: %d\n", CFE_PSP_FREERTOS_STARTUP_SCRIPT, (int)status);
-        return;
+        return status;
     }
-
-    status = OS_write(fd, CFE_ES_STARTUP_SCR_DATA, (size_t)CFE_ES_STARTUP_SCR_SIZE);
+    status = (size > 0) ? OS_write(fd, data, (size_t)size) : 0;
     (void)OS_close(fd);
+    return (status == (int32)size) ? OS_SUCCESS : OS_ERROR;
+}
 
-    if (status != (int32)CFE_ES_STARTUP_SCR_SIZE)
+/* Unpacks the embedded image into /cf: regular files and directories only. Reports and stops on any error. */
+static void CFE_PSP_InstallCfImage(void)
+{
+    const char *  image = CFE_PSP_CF_IMAGE_DATA;
+    unsigned long total = CFE_PSP_CF_IMAGE_SIZE;
+    unsigned long off   = 0;
+    unsigned long size;
+    unsigned      files = 0;
+    unsigned      dirs  = 0;
+    char          path[OS_MAX_PATH_LEN];
+    int           path_ok;
+    int32         status;
+
+    while (off + CFE_PSP_TAR_BLOCK <= total)
     {
-        OS_printf("CFE_PSP: cannot write %s: %d\n", CFE_PSP_FREERTOS_STARTUP_SCRIPT, (int)status);
-        return;
-    }
+        const char *hdr = &image[off];
 
-    OS_printf("CFE_PSP: embedded startup script installed as %s (%lu bytes)\n", CFE_PSP_FREERTOS_STARTUP_SCRIPT,
-              (unsigned long)CFE_ES_STARTUP_SCR_SIZE);
+        if (hdr[0] == '\0') /* end of archive (zero block) */
+        {
+            OS_printf("CFE_PSP: /cf image installed: %u file(s), %u director(ies)\n", files, dirs);
+            return;
+        }
+        path_ok = CFE_PSP_TarPath(hdr, path, sizeof(path));
+        if (memcmp(&hdr[257], "ustar", 5) != 0 || !CFE_PSP_TarOctal(&hdr[124], 12, &size) || path_ok < 0)
+        {
+            OS_printf("CFE_PSP: /cf image: bad entry at offset %lu\n", off);
+            return;
+        }
+        off += CFE_PSP_TAR_BLOCK;
+        if (size > total - off)
+        {
+            OS_printf("CFE_PSP: /cf image: %s is truncated\n", path);
+            return;
+        }
+
+        switch ((path_ok == 0) ? 'R' : hdr[156]) /* 'R': archive root, nothing to do */
+        {
+            case 'R':
+                break;
+            case '0':
+            case '\0':
+                status = CFE_PSP_WriteCfFile(path, &image[off], size);
+                if (status != OS_SUCCESS)
+                {
+                    OS_printf("CFE_PSP: cannot write %s: %d\n", path, (int)status);
+                    return;
+                }
+                ++files;
+                break;
+            case '5':
+                status = OS_mkdir(path, 0);
+                if (status != OS_SUCCESS)
+                {
+                    OS_printf("CFE_PSP: cannot create directory %s: %d\n", path, (int)status);
+                    return;
+                }
+                ++dirs;
+                break;
+            default:
+                OS_printf("CFE_PSP: /cf image: %s has unsupported type '%c', skipped\n", path, hdr[156]);
+                break;
+        }
+        off += (size + CFE_PSP_TAR_BLOCK - 1U) / CFE_PSP_TAR_BLOCK * CFE_PSP_TAR_BLOCK;
+    }
+    OS_printf("CFE_PSP: /cf image: no end-of-archive block\n");
 }
 
 void CFE_PSP_Main(void)
@@ -76,7 +207,7 @@ void CFE_PSP_Main(void)
     }
     else
     {
-        CFE_PSP_InstallStartupScript();
+        CFE_PSP_InstallCfImage();
     }
 
     CFE_PSP_ModuleInit();

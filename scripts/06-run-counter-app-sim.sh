@@ -22,7 +22,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/cfe-sim.sh
 source "${SCRIPT_DIR}/lib/cfe-sim.sh"
-cfe_sim_init
+cfe_sim_init freertos-posix-sim
 LOG_FILE="${LOG_DIR}/06-run-counter-app-sim.log"
 RUN_DIR="${LOG_DIR}/06-counter-app-runs"
 RUNS="${RUNS:-5}"

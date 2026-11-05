@@ -28,8 +28,6 @@
 /* Local path of the /cf fixed map (a directory of the OSAL RAM file system's root volume, D25). */
 #define CFE_PSP_FREERTOS_CF_LOCAL_PATH "/cf"
 
-/* Name under /cf of the embedded startup script (D5). */
-#define CFE_PSP_FREERTOS_STARTUP_SCRIPT "/cf/cfe_es_startup.scr"
 
 typedef struct
 {

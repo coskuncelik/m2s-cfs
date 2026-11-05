@@ -1,0 +1,10 @@
+CFE_LIB, cfe_assert,   CFE_Assert_LibInit, ASSERT_LIB,    0,   0,     0x0, 0;
+CFE_LIB, sample_lib,   SAMPLE_LIB_Init,    SAMPLE_LIB,    0,   0,     0x0, 0;
+CFE_APP, sample_app,   SAMPLE_APP_Main,    SAMPLE_APP,   50, 16384,   0x0, 0;
+CFE_APP, cfe_testcase, CFE_TestMain,       CFE_TEST_APP, 100, 16384,  0x0, 0;
+CFE_APP, ft_logdump,   FT_LOGDUMP_Main,    FT_LOGDUMP,  250, 8192,    0x0, 0;
+!
+! m2s-cfs: startup script for cFE's functional tests on the FreeRTOS simulator (step 05b).
+! Same entries as the native reference plus ft_logdump (priority 250: below the OSAL console task).
+! cFE stops parsing at the first '!'.
+!

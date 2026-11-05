@@ -20,6 +20,7 @@ SET(cpu1_FILELIST)
 SET(cpu1_STATIC_APPLIST counter_app)
 SET(cpu1_STATIC_SYMLIST "COUNTER_APP_Main,COUNTER_APP")
 
-# Startup script embedded in the executable; the PSP writes it to /cf at start-up (D5).
-# Available as CFE_ES_STARTUP_SCR_DATA[] / CFE_ES_STARTUP_SCR_SIZE; source: cpu1_cfe_es_startup.scr.
-SET(cpu1_EMBED_FILELIST "CFE_ES_STARTUP_SCR,cfe_es_startup.scr")
+# /cf image embedded in the executable; the PSP unpacks it into /cf at start-up (D5, D29).
+# cf.tar is built by scripts/lib/cfe-sim.sh in the build-time copy of this directory, from
+# cpu1_cfe_es_startup.scr (as cfe_es_startup.scr) and any table files; see cf_files.txt.
+SET(cpu1_EMBED_FILELIST "CFE_PSP_CF_IMAGE,cf.tar")

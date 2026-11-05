@@ -14,6 +14,7 @@ SET(OSAL_SYSTEM_OSTYPE   "freertos")
 SET(OSAL_SYSTEM_BSPTYPE  "freertos-posix-sim")
 
 # OSAL reads OSAL_EXT_SOURCE_DIR from the environment or its cache; set both for this cmake process.
-get_filename_component(M2S_ROOT_DIR "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
+# M2S_ROOT_DIR comes from m2s_paths.cmake, written into the build-time copy of this directory (scripts/lib/cfe-sim.sh).
+include("${CMAKE_CURRENT_LIST_DIR}/m2s_paths.cmake")
 SET(ENV{OSAL_EXT_SOURCE_DIR} "${M2S_ROOT_DIR}/osal-ext")
 SET(OSAL_EXT_SOURCE_DIR "${M2S_ROOT_DIR}/osal-ext" CACHE PATH "OSAL external OS/BSP sources" FORCE)
