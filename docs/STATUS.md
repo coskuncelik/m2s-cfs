@@ -16,7 +16,7 @@ Last updated: 2026-11-05. Read this first when resuming. Rules: `CLAUDE.md`. Dec
 | **05 PSP and cFE core on the simulator (D27)** | **closed 2026-11-04 (user approved)** | `docs/test-results/05-cfe-freertos-sim.md` |
 | **06 counter_app on the simulator (D28)** | **closed 2026-11-05 (user approved)** | `docs/test-results/06-counter-app-sim.md` |
 | **05b cFE functional tests on the simulator (D29)** | **closed 2026-11-05 (user approved)** | `docs/test-results/05b-cfe-functional-tests-sim.md` |
-| **07 shareable bundle `cfs-m2s-freertos` (D30)** | **closed 2026-11-05 (user approved); bundle not published yet** | `docs/test-results/07-export-bundle.md` |
+| **07 shareable bundle `cfs-m2s-freertos` (D30)** | **closed 2026-11-05 (user approved); published 2026-11-05: github.com/coskuncelik/cfs-m2s-freertos (public), commit `d48850f`** | `docs/test-results/07-export-bundle.md` |
 | SmartFusion2 target | not planned in detail yet (blocked by D7) | — |
 
 ## 04a: where it stands
@@ -101,7 +101,7 @@ in names; Apache-2.0 for our code; simulator + counter_app only; publish later a
 references, a fresh clone builds with stock `make prep && make && make install`, static-memory check, counter_app
 5/5. Regression 06/05/03/04 pass. Fixed on the way: `tables/staging` removed by cFE's `prepare()` (deferred mkdir,
 CMake >= 3.19). Closed and committed 2026-11-05 (user approved). Next: push the bundle to the GitHub
-repository https://github.com/coskuncelik/cfs-m2s-freertos (address given by the user).
+repository https://github.com/coskuncelik/cfs-m2s-freertos (address given by the user). Pushed by the user 2026-11-05 (the codespace token cannot write to it; a fine-grained token was used), public, `main` = `d48850f` (source revision `76de858`), verified with git ls-remote.
 
 ## Environment facts that matter
 - Current host (since 2026-11-04): Docker container, 2 vCPU Xeon Platinum 8370C, Ubuntu 24.04.5. No effective
