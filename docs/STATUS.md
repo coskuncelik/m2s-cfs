@@ -17,6 +17,8 @@ Last updated: 2026-11-05. Read this first when resuming. Rules: `CLAUDE.md`. Dec
 | **06 counter_app on the simulator (D28)** | **closed 2026-11-05 (user approved)** | `docs/test-results/06-counter-app-sim.md` |
 | **05b cFE functional tests on the simulator (D29)** | **closed 2026-11-05 (user approved)** | `docs/test-results/05b-cfe-functional-tests-sim.md` |
 | **07 shareable bundle `cfs-m2s-freertos` (D30)** | **closed 2026-11-05 (user approved); published 2026-11-05: github.com/coskuncelik/cfs-m2s-freertos (public), commit `d48850f`** | `docs/test-results/07-export-bundle.md` |
+| 08 cross-build for Cortex-M3 (arm-none-eabi-gcc, GCC/ARM_CM3; link map, malloc/_sbrk trap, memory footprint) | future work (user, 2026-11-05); needs approval to install the toolchain | — |
+| 09 run on an emulated Cortex-M3 (QEMU, e.g. mps2-an385; memory sizes to be checked) | future work (user, 2026-11-05); needs approval to install qemu-system-arm | — |
 | SmartFusion2 target | not planned in detail yet (blocked by D7) | — |
 
 ## 04a: where it stands
