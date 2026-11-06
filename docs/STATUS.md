@@ -120,12 +120,32 @@ Closed and committed 2026-11-05 (user approved). Next: step 09 (QEMU Cortex-M3) 
 One of three repeated `--clean` runs failed: two passing assertions of the SB "2 Thread Bulk Transfer" test (equal
 priority child tasks) were recorded in the other order. Fixed with user approval: the two multi-task SB tests are
 compared as a set, the order is strict elsewhere (D29 item 6). `ROUNDS=10` exit 0, 10/10 (and 10/10 in the run that
-contained a swapped round). Committed 2026-11-06 (user approved). Open: the user's VirtualBox 05b failures (logs to be sent).
+contained a swapped round). Committed 2026-11-06 (user approved). Open: the user's VirtualBox 05b failures (logs to be sent);
+see "Known issues on the VirtualBox VM host" below.
+
+## Known issues on the VirtualBox VM host (recorded 2026-11-06, user decision: keep as known, not investigated)
+
+Host `mpfs-devel`: VirtualBox VM, 2 vCPU, kernel 7.0.0-42, same Ubuntu/gcc/cmake as the Docker host. All scripts
+00–08 were re-run there on 2026-11-06. On the Docker host the same scripts pass. Logs (`logs/`) are not in git.
+
+| # | Script / test | Seen | What happens | Assessment |
+|---|---|---|---|---|
+| K1 | 04 `osal_timer_UT` 05.011/05.012 | 2 of 6 rounds | interval min 466–468 ms / max 530–534 ms vs window 475–525 ms (500 ms ±5 %) | host timing jitter (D15, D21) |
+| K2 | 04 `count-sem-test` | 1 of 6 rounds | lowest-priority task's `OS_CountSemTimedWait(1000)` returns -7 (timeout); the test still counts the loop step, so 7 counter assertions follow (8 FAIL) | host timing; not seen elsewhere |
+| K3 | 04 `sem-speed-test` | 1 of 3 rounds (2026-11-06, pinned) | main task's 5 s `OS_TaskDelay` overran by ~1 min: both workers finished all 10,000,000 iterations and exited, so both `OS_TaskDelete` return -16 (2 FAIL); teardown not finished within the 90 s limit (exit 137) | the workers did not deadlock; the high-priority sleeper was woken far too late, so FreeRTOS time stopped advancing properly. Reasoned: tick delivery starved by the host. Not proven. Related to D24 (sem-speed hang on the same VM) |
+| K4 | 06 counter_app | 1 of 10 runs | drift 13.0 ms over 18 s vs limit 10 ms (all intervals within ±50 ms) | host timing |
+| K5 | 05b round 3 (2026-11-06, before the set comparison) | 1 of 6 rounds | SB "4 Thread Bulk Transfer": counts frozen at 162754/162746 CMD, 162730/162722 TLM for >5 min while the test main task kept printing every second; killed at 300 s | **unexplained.** Clock and main task alive, transfer tasks stopped: looks like a lost wake-up / deadlock in the OSAL FreeRTOS layer (queues or `os-impl-sem.c`), not starvation. Not reproduced in the 3 rounds that followed. If seen again: run the image under gdb as its own child on this VM and inspect what the four tasks wait on |
+
+Rule of thumb: on this VM a single failure of K1–K4 is expected and is not a new bug. K5 (and any stall where the
+clock still runs) should be treated as a possible real defect.
 
 ## Environment facts that matter
 - Current host (since 2026-11-04): Docker container, 2 vCPU Xeon Platinum 8370C, Ubuntu 24.04.5. No effective
   capabilities: gdb cannot attach to a running process at all (`tools/debug/ptrace-launch.c` does not help here);
   gdb can still run a program as its own child. Core dumps go to the host's apport pipe and are not reachable.
-- Previous host was a 2-vCPU VirtualBox VM: `usleep(1000)` ≈ 2.7 ms; busy threads could starve others for seconds
-  (D14, D15, D21). Suspect host starvation first for any simulator hang or timing drift.
+- The 2-vCPU VirtualBox VM (`mpfs-devel`) is still in use alongside the Docker host: `usleep(1000)` ≈ 2.7 ms; busy
+  threads could starve others for seconds (D14, D15, D21). Suspect host starvation first for any simulator hang or
+  timing drift there (known issues K1–K4 above). On this VM gdb can run a program as its own child, and
+  `tools/debug/ptrace-launch.c` allows attaching later (ptrace_scope=1). The ARM toolchain is installed there too
+  (2026-11-06, same versions as the Docker host); script 08 passes.
 - Git: public repo https://github.com/coskuncelik/m2s-cfs, branch `main` (D23). Commit/push only with approval.
