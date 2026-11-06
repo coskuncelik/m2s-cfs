@@ -38,7 +38,7 @@ Resolved 2026-11-03.
 - The reference missions' nested submodules: their URLs use SSH (`git@github.com:`), and they are
   reference material only.
 
-## Host toolchain for the Cortex-M3 build (step 08)
+## Host toolchain for the Cortex-M3 build and emulator (steps 08 and 09)
 
 Installed by the user from Ubuntu 24.04 (noble/universe) on 2026-11-05; not pinned by script 00. Script 01
 reports it, script 08 logs the version it used.
@@ -48,6 +48,8 @@ reports it, script 08 logs the version it used.
 | `gcc-arm-none-eabi` | `15:13.2.rel1-2` (arm-none-eabi-gcc 13.2.1 20231009) |
 | `binutils-arm-none-eabi` | `2.42-1ubuntu1+23` |
 | `libnewlib-arm-none-eabi` | `4.4.0.20231231-2` (newlib-nano: `nano.specs`) |
+| `qemu-system-arm` (step 09) | `1:8.2.2+ds-0ubuntu1.18` (QEMU 8.2.2, machine `mps2-an385`) |
+| `gdb-multiarch` (step 09, debugging) | `15.1-1ubuntu1~24.04.1` |
 
 ## Notes
 

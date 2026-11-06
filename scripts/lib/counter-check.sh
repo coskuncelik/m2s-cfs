@@ -1,22 +1,27 @@
 #!/usr/bin/env bash
 # scripts/lib/counter-check.sh — counter_app run and output checks, shared by script 06 (project build) and
-# script 07-check-bundle (exported bundle). Sourced, not run. The caller sets EXE_DIR (directory holding
-# core-cpu1), RUN_DIR, RUNS, RUN_SECONDS, TOLERANCE_MS and DRIFT_MS, and provides log and die.
+# script 07-check-bundle (exported bundle) and script 09 (QEMU Cortex-M3). Sourced, not run. The caller sets
+# EXE_DIR (directory holding core-cpu1), RUN_DIR, RUNS, RUN_SECONDS, TOLERANCE_MS and DRIFT_MS, optionally
+# RUN_CMD (command run in EXE_DIR; default ./core-cpu1), and provides log and die.
 
 # Fixed strings that must appear in each run.
 EXPECTED_LINES=(
     "CFE_ES_ParseFileEntry: Loading file: /cf/counter_app.so, APP: COUNTER_APP"
     "CFE_ES_Main: CFE_ES_Main entering OPERATIONAL state"
 )
-# None of these may appear in a run (extended regex, case-insensitive).
-ERROR_PATTERN='error|fail|panic|cannot|too small|abort|assert|could not'
+# None of these may appear in a run (extended regex, case-insensitive). "M2S ..." lines are the Cortex-M3
+# trap, assert, fault, panic and stop messages (boards/common-cm3/m2s_cm3_diag.h).
+ERROR_PATTERN='error|fail|panic|cannot|too small|abort|assert|could not|M2S (TRAP|FAULT|ASSERT|PANIC|STOP)'
 
-# Runs core-cpu1 once; writes "<host seconds.micros> <line>" per output line to $1. Prints the exit status.
+# Runs RUN_CMD (default ./core-cpu1) once in EXE_DIR; writes "<host seconds.micros> <line>" per output line to
+# $1 (a trailing CR, as sent by a UART console, is removed). Prints the exit status.
 run_once() {
     local out="$1" rc
     set +e
-    (cd "${EXE_DIR}" && timeout -s INT "${RUN_SECONDS}" ./core-cpu1) 2>&1 \
-        | while IFS= read -r line; do printf '%s %s\n' "${EPOCHREALTIME}" "${line}"; done >"${out}"
+    # RUN_CMD is a command line with arguments: word splitting is intended.
+    # shellcheck disable=SC2086
+    (cd "${EXE_DIR}" && timeout -s INT "${RUN_SECONDS}" ${RUN_CMD:-./core-cpu1}) 2>&1 \
+        | while IFS= read -r line; do printf '%s %s\n' "${EPOCHREALTIME}" "${line%$'\r'}"; done >"${out}"
     rc="${PIPESTATUS[0]}"
     set -e
     echo "${rc}"

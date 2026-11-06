@@ -6,9 +6,10 @@
 #
 #   REQUIRED : needed for the current phases (native-POSIX baseline, FreeRTOS Linux simulator).
 #              Any missing or too-old REQUIRED tool -> exit 1.
-#   CM3      : Cortex-M3 cross build (step 08 onwards): arm-none-eabi gcc and binutils, newlib-nano.
-#              Reported with the apt command, never fails here (script 08 fails if they are missing).
-#   FUTURE   : needed later (emulator, JTAG). Reported only, never fails.
+#   CM3      : Cortex-M3 cross build and emulator (steps 08 and 09): arm-none-eabi gcc and binutils,
+#              newlib-nano, qemu-system-arm, gdb-multiarch. Reported with the apt command, never fails here
+#              (scripts 08 and 09 fail if what they need is missing).
+#   FUTURE   : needed later (JTAG on the board). Reported only, never fails.
 #
 # Usage: ./scripts/01-check-prerequisites.sh
 set -euo pipefail
@@ -32,10 +33,10 @@ REQUIRED=(
 CM3=(
     "arm-none-eabi-gcc|gcc-arm-none-eabi|Cortex-M3 cross compiler"
     "arm-none-eabi-objcopy|binutils-arm-none-eabi|Cortex-M3 binutils (objcopy, nm, size, readelf)"
+    "qemu-system-arm|qemu-system-arm|Cortex-M3 emulator, machine mps2-an385 (step 09)"
+    "gdb-multiarch|gdb-multiarch|debugger for the emulator (QEMU gdb server) and later JTAG"
 )
 FUTURE=(
-    "qemu-system-arm|qemu-system-arm|Cortex-M3 emulator (step 09)"
-    "gdb-multiarch|gdb-multiarch|JTAG debugging (or arm-none-eabi-gdb)"
     "openocd|openocd|JTAG server (Microchip build may be needed for FlashPro)"
 )
 
@@ -127,7 +128,7 @@ main() {
     if (( ${#MISSING_CM3[@]} > 0 )); then
         local cm3
         cm3="$(printf '%s\n' "${MISSING_CM3[@]}" | awk '!seen[$0]++' | tr '\n' ' ')"
-        log "NOTE    Cortex-M3 build tools missing (needed from step 08 on):"
+        log "NOTE    Cortex-M3 tools missing (cross build from step 08, emulator from step 09):"
         log "        $(apt_prefix)sudo apt install ${cm3% }"
     fi
     if (( ${#MISSING_FUTURE[@]} > 0 )); then

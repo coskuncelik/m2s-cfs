@@ -2,8 +2,8 @@
 
 How the pinned NASA cFE and OSAL run on FreeRTOS V11.3.2 in this project. Current scope: steps 04a (OSAL core
 layer and the Linux simulator BSP), 04b (static RAM file system), 04c (all OSAL functional tests) and 05 (PSP and
-cFE core on the simulator), 05b (cFE's functional tests), 06 (`counter_app`), 07 (shareable bundle) and 08 (Cortex-M3 cross-build on a placeholder board). The SmartFusion2
-board files do not exist yet (D7). Decisions are in `DECISIONS.md`.
+cFE core on the simulator), 05b (cFE's functional tests), 06 (`counter_app`), 07 (shareable bundle), 08 (Cortex-M3 cross-build on a placeholder board) and 09 (Cortex-M3 run on QEMU
+`mps2-an385`). The SmartFusion2 board files do not exist yet (D7). Decisions are in `DECISIONS.md`.
 
 ## Layers
 
@@ -140,27 +140,40 @@ The kernel helper takes its kernel, config and patch locations from `M2S_FREERTO
 in the bundle, and this repository uses the defaults. `export/sample_defs` must be kept in step with
 `config/cfe/freertos-posix-sim` by hand; script `07-check-bundle.sh` builds and runs the bundle to catch drift.
 
-## Cortex-M3 build (step 08, D31)
+## Cortex-M3 build and QEMU run (steps 08 and 09, D31, D32)
 
 ```
  counter_app, cFE, OSAL shared + OS layer "freertos"   same sources as the simulator
  cFE PSP "freertos-arm-cm3"     psp-ext/fsw/freertos-arm-cm3: simulator PSP sources + cfe_psp_support.c
-                                (reset through SCB AIRCR, panic halts)
+                                (reset through SCB AIRCR, panic prints "M2S PANIC" and halts)
  OSAL BSP "freertos-arm-cm3"    osal-ext/freertos-arm-cm3: main(), unbuffered stdout, BSP_MAIN static task,
-                                console -> M2S_Board_ConsoleWrite, assert / stack-overflow hooks halt
- board folder (M2S_BOARD_DIR)   m2s_board.h, startup_cm3.c (vector table, Reset_Handler), board.ld,
-                                board.c (console, clock), syscalls.c (newlib stubs, allocator and _sbrk traps)
+                                console -> M2S_Board_ConsoleWrite, assert / stack-overflow hooks print and halt
+ generic Cortex-M3 code         boards/common-cm3 (M2S_CM3_COMMON_DIR): startup_cm3.c (vector table, fault
+                                report, Reset_Handler), syscalls.c (newlib stubs, allocator and _sbrk traps),
+                                m2s_cm3_diag.c ("M2S ..." last-words lines straight to the board console)
+ board folder (M2S_BOARD_DIR)   m2s_board.h (clock, NVIC priority bits), board.c (console), board.ld
  FreeRTOS GCC/ARM_CM3 port      unmodified; config/freertos/arm_cm3/FreeRTOSConfig.h; no FreeRTOS heap
 ```
 
 - Mission `config/cfe/freertos-arm-cm3` (toolchain `arm-none-eabi-gcc`, newlib-nano, `Generic` platform). Script
   `08-build-cfe-arm-cm3.sh` builds it with the same script library as the simulator (`scripts/lib/cfe-sim.sh`,
   mission base and binutils as parameters).
-- The board is `boards/link-check`, a PLACEHOLDER: generic Cortex-M3 start-up, invented memory map (16 MiB code at
-  0, 64 MiB RAM at `0x20000000`), placeholder clock and NVIC priority bits, console that discards output. The
-  SmartFusion2 board folder replaces it once the board sources exist (D7).
-- No heap at link time: the board defines `malloc`/`free`/`calloc`/`realloc` and their newlib `_r` forms as traps;
-  the toolchain's `-u` options make the linker take them from the board library before the C library, so
+- Boards (`M2S_BOARD_NAME`, default `link-check`; a mission overlay's `m2s_board.cmake` can name another):
+  - `boards/link-check` (step 08): PLACEHOLDER — invented memory map (16 MiB code at 0, 64 MiB RAM at
+    `0x20000000`), placeholder clock and NVIC priority bits, console that discards output;
+  - `boards/qemu-mps2-an385` (step 09, mission overlay `config/cfe/freertos-arm-cm3-qemu`): QEMU's ARM MPS2
+    AN385 — code in SSRAM1 at 0, data/bss/main stack in PSRAM at `0x21000000`, 25 MHz, 3 priority bits,
+    console on the CMSDK UART0 at `0x40004000` (polled);
+  - the SmartFusion2 board folder comes with the board sources (D7).
+- `Reset_Handler` first quiesces what a boot loader may have left running (SysTick off, NVIC enables and
+  pending bits cleared, PendSV/SysTick pending cleared), sets VTOR to the vector table, prepares `.data`/`.bss`,
+  enables interrupts and calls `main()`. Faults print one "M2S FAULT" line (exception number, CFSR, HFSR,
+  MMFAR, BFAR, stacked PC/LR/xPSR) and halt; traps, asserts, panic and BSP stop print "M2S TRAP/ASSERT/PANIC/
+  STOP" lines. Scripts treat any of them as a failure.
+- QEMU runs with `-icount shift=auto,sleep=on,align=on` (D32): guest time from the instruction count, held to
+  host real time. In QEMU's default mode SysTick follows the host clock and late ticks are never made up.
+- No heap at link time: `boards/common-cm3/syscalls.c` defines `malloc`/`free`/`calloc`/`realloc` and their newlib `_r` forms as traps;
+  the toolchain's `-u` options make the linker take them from the kernel/board library before the C library, so
   newlib-nano's allocator (referenced by its printf core and stdio) is never linked and `_sbrk` is discarded.
 - Memory sizes are still the simulator's (bss about 7.6 MB, mostly PSP reserved memory 4 MiB, OSAL RAM pool
   1 MiB, cFE table and SB globals, OSAL queue table); they must be cut to the board's RAM later.

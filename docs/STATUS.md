@@ -18,7 +18,7 @@ Last updated: 2026-11-06. Read this first when resuming. Rules: `CLAUDE.md`. Dec
 | **05b cFE functional tests on the simulator (D29)** | **closed 2026-11-05 (user approved)** | `docs/test-results/05b-cfe-functional-tests-sim.md` |
 | **07 shareable bundle `cfs-m2s-freertos` (D30)** | **closed 2026-11-05 (user approved); published 2026-11-05: github.com/coskuncelik/cfs-m2s-freertos (public), commit `d48850f`** | `docs/test-results/07-export-bundle.md` |
 | **08 cross-build for Cortex-M3 (D31)** | **closed 2026-11-05 (user approved)** | `docs/test-results/08-cfe-arm-cm3-build.md` |
-| 09 run on an emulated Cortex-M3 (QEMU, e.g. mps2-an385; memory sizes to be checked) | future work (user, 2026-11-05); needs approval to install qemu-system-arm | — |
+| **09 cFE + counter_app on an emulated Cortex-M3, QEMU mps2-an385 (D32)** | **closed 2026-11-06 (user approved)** | `docs/test-results/09-cfe-arm-cm3-qemu.md` |
 | SmartFusion2 target | not planned in detail yet (blocked by D7) | — |
 
 ## 04a: where it stands
@@ -113,7 +113,7 @@ exit 0: ARMv7-M Thumb-2 image, entry and vectors checked, link map, no allocator
 approved after newlib's `malloc` was found linked), footprint text 212077 / data 1296 / bss 7568804 on the
 placeholder board `boards/link-check`. Regression 06/05/04/07-check pass. The published bundle is now one line
 behind (`os-impl-filesys.c` 32-bit guard; no behaviour change on 64-bit); republish only with approval.
-Closed and committed 2026-11-05 (user approved). Next: step 09 (QEMU Cortex-M3) when the user decides.
+Closed and committed 2026-11-05 (user approved).
 
 ## 05b re-run (2026-11-06)
 
@@ -122,6 +122,17 @@ priority child tasks) were recorded in the other order. Fixed with user approval
 compared as a set, the order is strict elsewhere (D29 item 6). `ROUNDS=10` exit 0, 10/10 (and 10/10 in the run that
 contained a swapped round). Committed 2026-11-06 (user approved). Open: the user's VirtualBox 05b failures (logs to be sent);
 see "Known issues on the VirtualBox VM host" below.
+
+## 09: result
+
+Plan approved 2026-11-06 (QEMU `mps2-an385`, `boards/qemu-mps2-an385` + `boards/common-cm3`, data in PSRAM with
+sizes unchanged, simulator timing limits) plus boot-loader quiesce code in `Reset_Handler`. QEMU 8.2.2 and
+gdb-multiarch were already installed. `./scripts/09-run-cfe-arm-cm3-qemu.sh --clean` exit 0: memory map checked,
+image and no-heap checks, 5/5 runs (cFE OPERATIONAL, counter 1..19, max deviation 2.4–5.9 ms, drift ≤ 3.1 ms, no
+`M2S` trap/fault lines). QEMU's default timing ran 6–13 % slow (lost SysTicks on a busy host); fixed with
+`-icount shift=auto,sleep=on,align=on`, limits unchanged (approved). Trap path checked with gdb (`malloc` →
+`M2S TRAP` line). Regression 08/06/05/07-check pass. Closed and committed 2026-11-06 (user approved). Next: possible 09b (OSAL
+and cFE functional tests on QEMU).
 
 ## Known issues on the VirtualBox VM host (recorded 2026-11-06, user decision: keep as known, not investigated)
 

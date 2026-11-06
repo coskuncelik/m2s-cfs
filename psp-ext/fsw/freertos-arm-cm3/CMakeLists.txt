@@ -26,6 +26,7 @@ target_compile_definitions(psp-${CFE_PSP_TARGETNAME}-impl PRIVATE
 target_include_directories(psp-${CFE_PSP_TARGETNAME}-impl PRIVATE
     inc
     $<TARGET_PROPERTY:psp_module_api,INTERFACE_INCLUDE_DIRECTORIES>
+    ${M2S_CM3_COMMON_DIR}   # m2s_cm3_diag.h (panic message), set by the toolchain file
 )
 
 # Project code: strict warnings.

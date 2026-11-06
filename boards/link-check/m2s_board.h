@@ -7,8 +7,8 @@
  *  - the console discards output;
  *  - the memory map (board.ld) is large enough for any footprint, so the link reports sizes instead
  *    of failing on them.
- * Interface every board provides: this header, M2S_Board_Init(), M2S_Board_ConsoleWrite(), a start-up
- * file with the vector table (startup_cm3.c), a linker script (board.ld), and the newlib system stubs.
+ * Interface every board provides: this header, M2S_Board_Init(), M2S_Board_ConsoleWrite() and a linker
+ * script (board.ld); the generic start-up and newlib stubs come from boards/common-cm3.
  */
 #ifndef M2S_BOARD_H
 #define M2S_BOARD_H

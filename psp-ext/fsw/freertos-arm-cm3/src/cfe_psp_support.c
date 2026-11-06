@@ -2,8 +2,9 @@
  * cfe_psp_support.c — m2s-cfs freertos-arm-cm3 PSP: restart, panic, caches, IDs.
  *
  * Restart: a system reset through the ARMv7-M Application Interrupt and Reset Control Register; static
- * memory does not survive it, so the next start is a power-on reset. Panic: the CPU stops with interrupts
- * off and the error code kept for a debugger (the console may not be running).
+ * memory does not survive it, so the next start is a power-on reset. Panic: one "M2S PANIC" line straight
+ * to the board console (the OSAL console task may not be running), then the CPU stops with interrupts off
+ * and the error code kept for a debugger.
  */
 #include <stdint.h>
 
@@ -11,6 +12,7 @@
 #include "osapi.h"
 #include "cfe_psp.h"
 #include "target_config.h"
+#include "m2s_cm3_diag.h"
 
 #define CFE_PSP_CPU_ID        (GLOBAL_CONFIGDATA.Default_CpuId)
 #define CFE_PSP_CPU_NAME      (GLOBAL_CONFIGDATA.Default_CpuName)
@@ -47,11 +49,12 @@ void CFE_PSP_Restart(uint32 resetType)
 
 void CFE_PSP_Panic(int32 ErrorCode)
 {
+    __asm volatile("cpsid i" ::: "memory");
     CFE_PSP_PanicCode = ErrorCode;
-    __asm volatile("cpsid i");
-    for (;;)
-    {
-    }
+    M2S_Diag_Write("\nM2S PANIC code ");
+    M2S_Diag_WriteHex((uint32_t)ErrorCode);
+    M2S_Diag_Write("\n");
+    M2S_Halt();
 }
 
 void CFE_PSP_FlushCaches(uint32 type, void *address, uint32 size)

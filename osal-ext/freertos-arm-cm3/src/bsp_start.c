@@ -16,6 +16,7 @@
 #include "osapi.h"
 #include "bsp-impl.h"
 #include "m2s_board.h"
+#include "m2s_cm3_diag.h"
 
 /* Main task: near the top of the OSAL range, as on the simulator. */
 #define BSP_MAIN_TASK_PRIORITY    (configMAX_PRIORITIES - 3)
@@ -33,11 +34,12 @@ void M2S_BSP_Stop(const char *reason);
 
 void M2S_BSP_Stop(const char *reason)
 {
-    M2S_BSP_StopReason = reason;
     taskDISABLE_INTERRUPTS();
-    for (;;)
-    {
-    }
+    M2S_BSP_StopReason = reason;
+    M2S_Diag_Write("\nM2S STOP ");
+    M2S_Diag_Write(reason);
+    M2S_Diag_Write("\n");
+    M2S_Halt();
 }
 
 void OS_BSP_Lock_Impl(void)
