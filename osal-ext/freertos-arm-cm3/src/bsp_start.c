@@ -3,10 +3,12 @@
  *
  * main() (called by the board's reset handler) sets up the board, creates one static BSP task and
  * starts the FreeRTOS scheduler. The BSP task runs OS_Application_Startup() and OS_Application_Run()
- * (OSAL needs a running scheduler, so neither may run before it). There is no process to exit: if the
- * application returns, the CPU stops (M2S_BSP_Stop).
+ * (OSAL needs a running scheduler, so neither may run before it). There is no process to exit: when the
+ * application returns, M2S_Program_Exit ends the program with its status (QEMU board: QEMU exits with it;
+ * other boards halt). M2S_BSP_Stop is the failure path: one "M2S STOP" line, then exit status 1.
  */
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "FreeRTOS.h"
@@ -39,7 +41,7 @@ void M2S_BSP_Stop(const char *reason)
     M2S_Diag_Write("\nM2S STOP ");
     M2S_Diag_Write(reason);
     M2S_Diag_Write("\n");
-    M2S_Halt();
+    M2S_Program_Exit(EXIT_FAILURE);
 }
 
 void OS_BSP_Lock_Impl(void)
@@ -70,7 +72,8 @@ static void OS_BSP_MainTask(void *arg)
     OS_Application_Startup();
     OS_Application_Run();
 
-    M2S_BSP_Stop((OS_BSP_Global.AppStatus == OS_SUCCESS) ? "application ended" : "application failed");
+    /* Flight images never get here (OS_Application_Run does not return); test programs do. */
+    M2S_Program_Exit((OS_BSP_Global.AppStatus == OS_SUCCESS) ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 
 int main(void)

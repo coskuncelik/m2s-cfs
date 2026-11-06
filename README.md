@@ -20,6 +20,7 @@ NASA cFS/cFE on FreeRTOS Kernel V11.3.2, targeting:
 ./scripts/07-check-bundle.sh    # verify it: reproducible, upstream files unchanged, no private references, fresh clone builds and runs counter_app
 ./scripts/08-build-cfe-arm-cm3.sh --clean # cross-build cFE + counter_app for the Cortex-M3 (placeholder board): image, vectors, link map, no heap, footprint
 ./scripts/09-run-cfe-arm-cm3-qemu.sh --clean # same image for QEMU mps2-an385 (Cortex-M3): cFE + counter_app run on the emulated CPU, 5 runs of 20 s
+./scripts/09b-run-osal-tests-arm-cm3-qemu.sh --clean # OSAL's 25 functional test programs on the emulated Cortex-M3 (QEMU), 3 rounds
 ```
 
 ## Documentation
@@ -46,5 +47,7 @@ and `counter_app` prints its start-up message and a counter every second (`docs/
 target is not done yet: the same code cross-builds for an ARM Cortex-M3 with `arm-none-eabi-gcc` and links
 without any heap, on a placeholder board (`docs/test-results/08-cfe-arm-cm3-build.md`; toolchain install
 command from script 01), and it runs on an emulated Cortex-M3 in QEMU (`mps2-an385`): cFE reaches OPERATIONAL and
-`counter_app` counts every second (`docs/test-results/09-cfe-arm-cm3-qemu.md`). `scripts/07-export-bundle.sh` generates the shareable bundle `cfs-m2s-freertos` for the
+`counter_app` counts every second (`docs/test-results/09-cfe-arm-cm3-qemu.md`); OSAL's functional tests give the
+same results there as on the simulator, and D22's simulator-only failure passes
+(`docs/test-results/09b-osal-tests-arm-cm3-qemu.md`). `scripts/07-export-bundle.sh` generates the shareable bundle `cfs-m2s-freertos` for the
 team (`docs/test-results/07-export-bundle.md`); `export/` holds the files that exist only in the bundle.

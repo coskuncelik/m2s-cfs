@@ -45,6 +45,19 @@ void M2S_Diag_WriteDec(uint32_t Value)
     M2S_Board_ConsoleWrite(&buf[pos], sizeof(buf) - pos);
 }
 
+/* Defined only in test images (test_heap.c). */
+extern void M2S_TestHeap_Report(void) __attribute__((weak));
+
+void M2S_Program_Exit(int Status)
+{
+    __asm volatile("cpsid i" ::: "memory");
+    if (M2S_TestHeap_Report != NULL)
+    {
+        M2S_TestHeap_Report();
+    }
+    M2S_Board_Exit(Status);
+}
+
 void M2S_Halt(void)
 {
     __asm volatile("cpsid i" ::: "memory");

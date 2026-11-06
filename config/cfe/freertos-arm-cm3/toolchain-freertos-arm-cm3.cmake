@@ -8,12 +8,6 @@
 #
 ######################################################################
 
-SET(CMAKE_SYSTEM_NAME      Generic)
-SET(CMAKE_SYSTEM_PROCESSOR arm)
-SET(CMAKE_C_COMPILER       "arm-none-eabi-gcc")
-# The compiler checks cannot link a program without the board's start-up and linker script.
-SET(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
-
 SET(CFE_SYSTEM_PSPNAME   "freertos-arm-cm3")
 SET(OSAL_SYSTEM_OSTYPE   "freertos")
 SET(OSAL_SYSTEM_BSPTYPE  "freertos-arm-cm3")
@@ -31,19 +25,7 @@ if(NOT DEFINED M2S_BOARD_NAME)
 endif()
 SET(M2S_BOARD_DIR "${M2S_ROOT_DIR}/boards/${M2S_BOARD_NAME}" CACHE PATH "Board folder (linker script, console, clock)" FORCE)
 
-# Cortex-M3, Thumb-2, no FPU. Sections per function/object so unused code is dropped at link time.
-# nano.specs (newlib-nano headers and libraries) is in the C flags only: CMake also puts the C flags on the
-# link line, and gcc rejects the specs file given twice.
-SET(M2S_CM3_FLAGS "-mcpu=cortex-m3 -mthumb -mfloat-abi=soft")
-SET(CMAKE_C_FLAGS_INIT "${M2S_CM3_FLAGS} --specs=nano.specs -ffunction-sections -fdata-sections")
-# -nostartfiles: the board's reset handler is the start-up (no newlib crt0). The map file is written next
-# to the executable. -u keeps the start-up object (vector table) even though nothing calls it.
-# The allocator symbols are also marked undefined from the start, so the linker takes them from the
-# board's traps (syscalls.c, in the board library, which comes before the C library on the link line)
-# before anything in newlib asks for them; newlib's own allocator objects are then never pulled in.
-SET(M2S_ALLOC_TRAPS "-Wl,-u,malloc -Wl,-u,free -Wl,-u,calloc -Wl,-u,realloc -Wl,-u,_malloc_r -Wl,-u,_free_r -Wl,-u,_calloc_r -Wl,-u,_realloc_r")
-SET(CMAKE_EXE_LINKER_FLAGS_INIT
-    "${M2S_CM3_FLAGS} -nostartfiles -T${M2S_BOARD_DIR}/board.ld -Wl,--gc-sections -Wl,-Map=core-cpu1.map -Wl,-u,Reset_Handler -Wl,-u,M2S_VectorTable ${M2S_ALLOC_TRAPS}")
-# The C library goes inside the link group (arch_build_custom.cmake), so its references to the board's
-# newlib stubs (e.g. _sbrk) resolve against the board library.
-SET(CMAKE_C_STANDARD_LIBRARIES "-lc -lm -lgcc")
+# Compiler and linker settings shared with the standalone OSAL test build (cmake/arm-cm3-flags.cmake).
+include("${M2S_ROOT_DIR}/cmake/arm-cm3-flags.cmake")
+# The map file is written next to the executable. The link group is in arch_build_custom.cmake.
+SET(CMAKE_EXE_LINKER_FLAGS_INIT "${M2S_CM3_LINK_FLAGS} -Wl,-Map=core-cpu1.map")

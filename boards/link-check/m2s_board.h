@@ -7,7 +7,7 @@
  *  - the console discards output;
  *  - the memory map (board.ld) is large enough for any footprint, so the link reports sizes instead
  *    of failing on them.
- * Interface every board provides: this header, M2S_Board_Init(), M2S_Board_ConsoleWrite() and a linker
+ * Interface every board provides: this header, M2S_Board_Init(), M2S_Board_ConsoleWrite(), M2S_Board_Exit() and a linker
  * script (board.ld); the generic start-up and newlib stubs come from boards/common-cm3.
  */
 #ifndef M2S_BOARD_H
@@ -27,6 +27,10 @@ void M2S_Board_Init(void);
 
 /* Writes DataLen bytes to the board console (blocking). Used by the OSAL BSP console output. */
 void M2S_Board_ConsoleWrite(const char *Str, size_t DataLen);
+
+/* Ends the program with Status (0 = success): this board has no host to report to, so it prints
+ * "M2S STOP" and halts. */
+void M2S_Board_Exit(int Status) __attribute__((noreturn));
 #endif
 
 #endif /* M2S_BOARD_H */

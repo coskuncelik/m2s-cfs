@@ -14,6 +14,16 @@ if(NOT M2S_CM3_COMMON_DIR OR NOT EXISTS "${M2S_CM3_COMMON_DIR}/startup_cm3.c")
     message(FATAL_ERROR "freertos-arm-cm3 BSP: M2S_CM3_COMMON_DIR must name boards/common-cm3 (got '${M2S_CM3_COMMON_DIR}')")
 endif()
 
+# Allocator entry points: traps in every flight image; a static test-only pool for OSAL/cFE test images
+# (ut_assert needs malloc, D33). Exactly one of the two is linked.
+option(M2S_CM3_TEST_HEAP "Link the test-only allocator (test images only, never flight)" OFF)
+if(M2S_CM3_TEST_HEAP)
+    set(M2S_CM3_ALLOC_SRC ${M2S_CM3_COMMON_DIR}/test_heap.c)
+    message(STATUS "freertos-arm-cm3 BSP: TEST image — test_heap.c (static test-only allocator) instead of the allocator traps")
+else()
+    set(M2S_CM3_ALLOC_SRC ${M2S_CM3_COMMON_DIR}/alloc_traps.c)
+endif()
+
 # Kernel + unmodified ARM_CM3 port + FreeRTOS hooks + board code (start-up, services, newlib stubs).
 # All in one library: the linker pulls the start-up through ENTRY(Reset_Handler) and -u options.
 include(${CMAKE_CURRENT_LIST_DIR}/../../cmake/freertos-arm-cm3-kernel.cmake)
@@ -23,6 +33,7 @@ m2s_add_freertos_arm_cm3_kernel(m2s_freertos_kernel
         ${CMAKE_CURRENT_LIST_DIR}/src/bsp_freertos_hooks.c
         ${M2S_CM3_COMMON_DIR}/startup_cm3.c
         ${M2S_CM3_COMMON_DIR}/syscalls.c
+        ${M2S_CM3_ALLOC_SRC}
         ${M2S_CM3_COMMON_DIR}/m2s_cm3_diag.c
         ${M2S_BOARD_DIR}/board.c)
 target_include_directories(m2s_freertos_kernel PUBLIC ${M2S_CM3_COMMON_DIR})

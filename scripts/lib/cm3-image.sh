@@ -80,13 +80,17 @@ map_origin() {
 check_no_heap() {
     local bin="${EXE_DIR}/core-cpu1" syms sym origin defined=() bad=0
     syms="$("${NM}" "${bin}")"
-    # Allocator entry points may exist only as the board's traps (syscalls.c); newlib's allocator objects
+    # Flight image: allocator entry points may exist only as the traps (boards/common-cm3/alloc_traps.c, never
+    # the test allocator test_heap.c) and _sbrk only as the syscalls.c trap; newlib's allocator objects
     # (mallocr, freer, reallocr, callocr, ...) and the FreeRTOS heap must not be linked.
+    local want
     for sym in malloc free calloc realloc _malloc_r _free_r _calloc_r _realloc_r _sbrk; do
         grep -Eq " [TtWw] ${sym}$" <<<"${syms}" || continue
         origin="$(map_origin "${sym}")"
-        if [[ "${origin}" != syscalls.c.obj ]]; then
-            log "ERROR ${sym} linked from '${origin:-unknown}', not from the board's syscalls.c trap"
+        want="alloc_traps.c.obj"
+        [[ "${sym}" == _sbrk ]] && want="syscalls.c.obj"
+        if [[ "${origin}" != "${want}" ]]; then
+            log "ERROR ${sym} linked from '${origin:-unknown}', not from the trap in ${want%.obj}"
             bad=1
         fi
         defined+=("${sym}")
@@ -102,5 +106,5 @@ check_no_heap() {
     fi
     (( bad == 0 )) || die "dynamic allocation linked into core-cpu1"
     log "OK   no allocator and no heap linked: newlib allocator objects absent from the map;"
-    log "     present only as the board traps (syscalls.c): ${defined[*]:-none}"
+    log "     present only as the traps (alloc_traps.c, _sbrk in syscalls.c): ${defined[*]:-none}"
 }

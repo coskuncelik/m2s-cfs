@@ -1,11 +1,11 @@
 /*
  * syscalls.c — m2s-cfs generic Cortex-M3: newlib system stubs (no OS underneath), shared by all boards.
  *
- * No heap. The allocator entry points of newlib (malloc, free, calloc, realloc and their reentrant _r
- * forms) are defined here as traps: they record the call and halt. Because these definitions come first
- * in the link group, newlib's allocator objects are never linked; newlib-nano's printf core still
- * references _malloc_r/_free_r/_realloc_r (only used for growing strings, e.g. asprintf), and those
- * references land here. _sbrk is a trap too, for any other path that asks for heap memory.
+ * No heap: _sbrk is a trap, for any path that asks newlib for heap memory. The allocator entry points
+ * (malloc, free, calloc, realloc and their reentrant _r forms) are in a separate file, so a build links
+ * exactly one of: alloc_traps.c (every flight image: each call traps) or test_heap.c (OSAL/cFE test images
+ * only: ut_assert needs malloc). Either way they come first in the link group, so newlib's allocator
+ * objects are never linked.
  * The other stubs exist only if the C library references them; console output goes through OSAL
  * (OS_printf -> BSP -> board). stdout is unbuffered (set by the BSP), so stdio never allocates a buffer.
  * Every trap prints one "M2S TRAP" line on the board console before halting (m2s_cm3_diag.h).
@@ -32,73 +32,6 @@ void *_sbrk(ptrdiff_t incr)
     M2S_Diag_WriteDec((uint32_t)incr);
     M2S_Diag_Write(" (dynamic allocation is not allowed)\n");
     M2S_Halt();
-}
-
-/* Which allocator entry point trapped (1 malloc, 2 free, 3 calloc, 4 realloc) and the requested size. */
-volatile uint32_t M2S_AllocTrapWhich;
-volatile size_t   M2S_AllocTrapSize;
-
-static void M2S_AllocTrap(uint32_t which, size_t size) __attribute__((noreturn));
-static void M2S_AllocTrap(uint32_t which, size_t size)
-{
-    static const char *const names[] = {"?", "malloc", "free", "calloc", "realloc"};
-
-    M2S_AllocTrapWhich = which;
-    M2S_AllocTrapSize  = size;
-    M2S_Diag_Write("\nM2S TRAP ");
-    M2S_Diag_Write(names[(which < 5U) ? which : 0U]);
-    M2S_Diag_Write(" size ");
-    M2S_Diag_WriteDec((uint32_t)size);
-    M2S_Diag_Write(" (dynamic allocation is not allowed)\n");
-    M2S_Halt();
-}
-
-void *_malloc_r(struct _reent *r, size_t size)
-{
-    (void)r;
-    M2S_AllocTrap(1U, size);
-}
-
-void _free_r(struct _reent *r, void *ptr)
-{
-    (void)r;
-    (void)ptr;
-    M2S_AllocTrap(2U, 0U);
-}
-
-void *_calloc_r(struct _reent *r, size_t n, size_t size)
-{
-    (void)r;
-    M2S_AllocTrap(3U, n * size);
-}
-
-void *_realloc_r(struct _reent *r, void *ptr, size_t size)
-{
-    (void)r;
-    (void)ptr;
-    M2S_AllocTrap(4U, size);
-}
-
-void *malloc(size_t size)
-{
-    M2S_AllocTrap(1U, size);
-}
-
-void free(void *ptr)
-{
-    (void)ptr;
-    M2S_AllocTrap(2U, 0U);
-}
-
-void *calloc(size_t n, size_t size)
-{
-    M2S_AllocTrap(3U, n * size);
-}
-
-void *realloc(void *ptr, size_t size)
-{
-    (void)ptr;
-    M2S_AllocTrap(4U, size);
 }
 
 int _write(int fd, const char *buf, int len)
@@ -162,10 +95,8 @@ int _kill(int pid, int sig)
     return -1;
 }
 
+/* exit() (e.g. OS_ApplicationExit, the end of an OSAL test) ends here, after newlib's exit handlers. */
 void _exit(int status)
 {
-    M2S_Diag_Write("\nM2S STOP _exit status ");
-    M2S_Diag_WriteDec((uint32_t)status);
-    M2S_Diag_Write("\n");
-    M2S_Halt();
+    M2S_Program_Exit(status);
 }

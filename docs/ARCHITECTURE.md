@@ -2,8 +2,8 @@
 
 How the pinned NASA cFE and OSAL run on FreeRTOS V11.3.2 in this project. Current scope: steps 04a (OSAL core
 layer and the Linux simulator BSP), 04b (static RAM file system), 04c (all OSAL functional tests) and 05 (PSP and
-cFE core on the simulator), 05b (cFE's functional tests), 06 (`counter_app`), 07 (shareable bundle), 08 (Cortex-M3 cross-build on a placeholder board) and 09 (Cortex-M3 run on QEMU
-`mps2-an385`). The SmartFusion2 board files do not exist yet (D7). Decisions are in `DECISIONS.md`.
+cFE core on the simulator), 05b (cFE's functional tests), 06 (`counter_app`), 07 (shareable bundle), 08 (Cortex-M3 cross-build on a placeholder board), 09 (Cortex-M3 run on QEMU
+`mps2-an385`) and 09b (OSAL functional tests on QEMU). The SmartFusion2 board files do not exist yet (D7). Decisions are in `DECISIONS.md`.
 
 ## Layers
 
@@ -149,9 +149,11 @@ in the bundle, and this repository uses the defaults. `export/sample_defs` must 
  OSAL BSP "freertos-arm-cm3"    osal-ext/freertos-arm-cm3: main(), unbuffered stdout, BSP_MAIN static task,
                                 console -> M2S_Board_ConsoleWrite, assert / stack-overflow hooks print and halt
  generic Cortex-M3 code         boards/common-cm3 (M2S_CM3_COMMON_DIR): startup_cm3.c (vector table, fault
-                                report, Reset_Handler), syscalls.c (newlib stubs, allocator and _sbrk traps),
-                                m2s_cm3_diag.c ("M2S ..." last-words lines straight to the board console)
- board folder (M2S_BOARD_DIR)   m2s_board.h (clock, NVIC priority bits), board.c (console), board.ld
+                                report, Reset_Handler), syscalls.c (newlib stubs, _sbrk trap), alloc_traps.c
+                                (flight) or test_heap.c (test images only, D33), m2s_cm3_diag.c ("M2S ..." lines,
+                                M2S_Program_Exit)
+ board folder (M2S_BOARD_DIR)   m2s_board.h (clock, NVIC priority bits), board.c (console, M2S_Board_Exit),
+                                board.ld
  FreeRTOS GCC/ARM_CM3 port      unmodified; config/freertos/arm_cm3/FreeRTOSConfig.h; no FreeRTOS heap
 ```
 
@@ -170,6 +172,12 @@ in the bundle, and this repository uses the defaults. `export/sample_defs` must 
   enables interrupts and calls `main()`. Faults print one "M2S FAULT" line (exception number, CFSR, HFSR,
   MMFAR, BFAR, stacked PC/LR/xPSR) and halt; traps, asserts, panic and BSP stop print "M2S TRAP/ASSERT/PANIC/
   STOP" lines. Scripts treat any of them as a failure.
+- Program end (D33): `exit()`/`_exit`, the end of `OS_Application_Run` (test programs) and BSP stops go
+  through `M2S_Program_Exit(status)` → `M2S_Board_Exit`: on QEMU an ARM semihosting exit, so QEMU ends with the
+  status; on other boards "M2S STOP" and halt.
+- OSAL test images (step 09b): OSAL built on its own with `config/osal/freertos-arm-cm3/toolchain.cmake`
+  (shared settings in `cmake/arm-cm3-flags.cmake`, board `qemu-mps2-an385`, libraries in one ld group, one
+  map per program). They link the test-only allocator because `ut_assert` uses `malloc`; flight images never.
 - QEMU runs with `-icount shift=auto,sleep=on,align=on` (D32): guest time from the instruction count, held to
   host real time. In QEMU's default mode SysTick follows the host clock and late ticks are never made up.
 - No heap at link time: `boards/common-cm3/syscalls.c` defines `malloc`/`free`/`calloc`/`realloc` and their newlib `_r` forms as traps;

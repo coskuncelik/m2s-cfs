@@ -19,6 +19,7 @@ Last updated: 2026-11-06. Read this first when resuming. Rules: `CLAUDE.md`. Dec
 | **07 shareable bundle `cfs-m2s-freertos` (D30)** | **closed 2026-11-05 (user approved); published 2026-11-05: github.com/coskuncelik/cfs-m2s-freertos (public), commit `d48850f`** | `docs/test-results/07-export-bundle.md` |
 | **08 cross-build for Cortex-M3 (D31)** | **closed 2026-11-05 (user approved)** | `docs/test-results/08-cfe-arm-cm3-build.md` |
 | **09 cFE + counter_app on an emulated Cortex-M3, QEMU mps2-an385 (D32)** | **closed 2026-11-06 (user approved)** | `docs/test-results/09-cfe-arm-cm3-qemu.md` |
+| **09b OSAL functional tests on the emulated Cortex-M3, QEMU (D33)** | **closed 2026-11-06 (user approved)** | `docs/test-results/09b-osal-tests-arm-cm3-qemu.md` |
 | SmartFusion2 target | not planned in detail yet (blocked by D7) | — |
 
 ## 04a: where it stands
@@ -133,6 +134,16 @@ image and no-heap checks, 5/5 runs (cFE OPERATIONAL, counter 1..19, max deviatio
 `-icount shift=auto,sleep=on,align=on`, limits unchanged (approved). Trap path checked with gdb (`malloc` →
 `M2S TRAP` line). Regression 08/06/05/07-check pass. Closed and committed 2026-11-06 (user approved). Next: possible 09b (OSAL
 and cFE functional tests on QEMU).
+
+## 09b: result
+
+Plan approved 2026-11-06 (test-only static allocator for ut_assert, semihosting exit on the QEMU board, ROUNDS=3,
+cFE functional tests on QEMU later as 09c). `./scripts/09b-run-osal-tests-arm-cm3-qemu.sh --clean` exit 0: 75/75
+runs (25 tests x 3); same totals as the simulator except osal-core-test 622/622 — D22's simulator-only failure
+passes on the Cortex-M3; only D26's 12 configuration failures allowed. Test heap 184–4496 B of 1 MiB. The flight
+allocator-origin check was updated for `alloc_traps.c` (first regression of 08/09 failed on that check only).
+Regression 08/09/04/06/05 pass (run 2026-11-06 evening, after the user stopped the first one for time).
+Closed and committed 2026-11-06 (user approved). Next: 09c (cFE functional tests on QEMU) when the user decides.
 
 ## Known issues on the VirtualBox VM host (recorded 2026-11-06, user decision: keep as known, not investigated)
 

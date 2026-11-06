@@ -6,7 +6,7 @@
  * 0x21000000 (data, bss, main stack); UART0 = CMSDK APB UART at 0x40004000 (pclk 25 MHz).
  * NVIC priority bits: 3, as on the real MPS2 Cortex-M3 (QEMU emulates at least that many; the FreeRTOS
  * port checks the priority settings against the hardware at scheduler start).
- * Board interface: this header, M2S_Board_Init(), M2S_Board_ConsoleWrite(), board.ld; the generic
+ * Board interface: this header, M2S_Board_Init(), M2S_Board_ConsoleWrite(), M2S_Board_Exit(), board.ld; the generic
  * start-up and newlib stubs come from boards/common-cm3.
  */
 #ifndef M2S_BOARD_H
@@ -26,6 +26,10 @@ void M2S_Board_Init(void);
 
 /* Writes DataLen bytes to UART0 (polled, blocking; usable with interrupts off). */
 void M2S_Board_ConsoleWrite(const char *Str, size_t DataLen);
+
+/* Ends the program with Status (0 = success): QEMU exits with that status through semihosting
+ * (needs -semihosting-config enable=on,target=native; without it the CPU halts after "M2S STOP"). */
+void M2S_Board_Exit(int Status) __attribute__((noreturn));
 #endif
 
 #endif /* M2S_BOARD_H */
