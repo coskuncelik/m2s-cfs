@@ -14,7 +14,8 @@
 #   2. each run completes (summary line present) within RUN_TIMEOUT; the FreeRTOS log is rebuilt from the
 #      console and its size equals the size ft_logdump reports;
 #   3. every assertion (status + file:line, in order) is the same as in the native reference, except the
-#      entries in KNOWN_DIFFS; every FreeRTOS round gives the same list;
+#      entries in KNOWN_DIFFS; every FreeRTOS round gives the same list. Inside the UNORDERED_GROUPS tests
+#      (concurrent child tasks of equal priority) the order is free and only the set of assertions counts;
 #   4. sources/ unchanged.
 #
 # Host side effects of the native phase (stock pc-linux PSP, as script 02): SysV shared memory segments and
@@ -59,9 +60,41 @@ parse_args() {
     [[ "${RUN_TIMEOUT}" =~ ^[1-9][0-9]*$ ]] || die "RUN_TIMEOUT must be a positive integer (got '${RUN_TIMEOUT}')"
 }
 
+# Test groups (UtTest_Add names) whose assertions come from concurrent child tasks of equal priority. Their
+# relative order depends on where a time slice ends, on any OS (sb_performance_test.c: TestBulkTransferMulti2
+# starts CmdXmit and TlmXmit at priority 150; TestBulkTransferMulti4 starts two pairs). Inside these groups the
+# assertions are compared as a set (same lines, same results, any order); everywhere else the order counts (D29).
+UNORDERED_GROUPS=(
+    "2 Thread Bulk Transfer"
+    "4 Thread Bulk Transfer"
+)
+
 # Assertion list of a cfe_assert log: "<STATUS> <file:line>" per assertion, in order (INFO/BEGIN/END omitted).
+# Inside an UNORDERED_GROUPS group the group's lines are sorted, so only their set is compared.
 assertions() {
-    sed -nE 's/^\[ *(PASS|FAIL|TSF|TTF|MIR|N\/A|ABORT|WARN)\] [0-9.]+ ([^ ]+:[0-9]+) .*/\1 \2/p' "$1"
+    local groups
+    groups="$(printf '%s\n' "${UNORDERED_GROUPS[@]}")"
+    awk -v groups="${groups}" '
+        BEGIN { n = split(groups, g, "\n"); for (i = 1; i <= n; i++) if (g[i] != "") unordered[g[i]] = 1 }
+        function flush(   i, j, t) {
+            for (i = 2; i <= cnt; i++) {            # insertion sort (portable awk, small groups)
+                t = buf[i]
+                for (j = i - 1; j >= 1 && buf[j] > t; j--) buf[j + 1] = buf[j]
+                buf[j + 1] = t
+            }
+            for (i = 1; i <= cnt; i++) print buf[i]
+            cnt = 0; inset = 0
+        }
+        /^\[BEGIN\] [0-9]+ / { name = $0; sub(/^\[BEGIN\] [0-9]+ /, "", name); inset = (name in unordered); cnt = 0; next }
+        /^\[ *END\] [0-9]+ / { if (inset) flush(); next }
+        match($0, /^\[ *(PASS|FAIL|TSF|TTF|MIR|N\/A|ABORT|WARN)\] [0-9.]+ [^ ]+:[0-9]+ /) {
+            line = substr($0, 1, RLENGTH - 1)
+            st = line; sub(/^\[ */, "", st); sub(/\].*/, "", st)
+            loc = line; sub(/.* /, "", loc)
+            if (inset) buf[++cnt] = st " " loc; else print st " " loc
+        }
+        END { if (inset) flush() }
+    ' "$1"
 }
 
 # Starts $1 (command) in directory $2 with output to $3; waits until file $4 matches regex $5 or RUN_TIMEOUT,

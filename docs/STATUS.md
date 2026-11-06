@@ -1,6 +1,6 @@
 # Project status
 
-Last updated: 2026-11-05. Read this first when resuming. Rules: `CLAUDE.md`. Decisions: `docs/DECISIONS.md`.
+Last updated: 2026-11-06. Read this first when resuming. Rules: `CLAUDE.md`. Decisions: `docs/DECISIONS.md`.
 
 ## Steps
 
@@ -114,6 +114,13 @@ approved after newlib's `malloc` was found linked), footprint text 212077 / data
 placeholder board `boards/link-check`. Regression 06/05/04/07-check pass. The published bundle is now one line
 behind (`os-impl-filesys.c` 32-bit guard; no behaviour change on 64-bit); republish only with approval.
 Closed and committed 2026-11-05 (user approved). Next: step 09 (QEMU Cortex-M3) when the user decides.
+
+## 05b re-run (2026-11-06)
+
+One of three repeated `--clean` runs failed: two passing assertions of the SB "2 Thread Bulk Transfer" test (equal
+priority child tasks) were recorded in the other order. Fixed with user approval: the two multi-task SB tests are
+compared as a set, the order is strict elsewhere (D29 item 6). `ROUNDS=10` exit 0, 10/10 (and 10/10 in the run that
+contained a swapped round). Committed 2026-11-06 (user approved). Open: the user's VirtualBox 05b failures (logs to be sent).
 
 ## Environment facts that matter
 - Current host (since 2026-11-04): Docker container, 2 vCPU Xeon Platinum 8370C, Ubuntu 24.04.5. No effective

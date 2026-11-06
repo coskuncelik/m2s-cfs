@@ -71,3 +71,23 @@ lower rates are expected; the test scales its message count with the calibration
   static loader; table files reach `/cf` through the embedded image.
 - Not covered: processor resets, app reload from a file (the static loader ignores the file), the board.
 - The native phase uses the stock pc-linux PSP, which creates SysV shared memory segments on the host (as step 02).
+
+## Re-run 2026-11-06: assertion order in the multi-task SB tests (D29 item 6)
+
+- Repeated runs on the same Docker host: `--clean` ×3 rounds passed twice, then one run failed (exit 1). In round 1
+  the only change was the order of two passing lines, `PASS sb_performance_test.c:236` before
+  `PASS sb_performance_test.c:183`; results and totals were identical (2521 / 2043 PASS / 1 FAIL known / 13 MIR).
+  Cause: "2 Thread Bulk Transfer" starts `CmdXmit` and `TlmXmit` at the same priority (150); each records one
+  assertion when it starts, and which goes first depends on where the 1 ms time slice ends. The strict in-order
+  comparison then failed that round and, through the round-vs-round check, the other two.
+- Fix (approved): in the tests "2 Thread Bulk Transfer" and "4 Thread Bulk Transfer" the assertions are compared as
+  a set (same lines and results, any order); order stays strict everywhere else. Checked on the saved logs: only
+  assertion lines 1283–1327 (the 48 assertions of these two tests) change position, and a PASS turned into FAIL
+  inside them is still reported.
+- `ROUNDS=10 ./scripts/05b-run-cfe-functional-tests-sim.sh --clean`: all 10 rounds equal to native except the known
+  one; round 7 had the swapped order (236 before 183) and passed. (That run ended with exit 2 only because the
+  script's header comment was edited while it ran; bash then misread the rest of the file.)
+- `ROUNDS=10 ./scripts/05b-run-cfe-functional-tests-sim.sh` (script unchanged during the run): exit 0, 10/10 rounds
+  passed (53–57 s each); all 10 in the usual order (183 before 236).
+- The swap was seen in 2 of 23 FreeRTOS rounds on this host. A slower or busier host (e.g. the VirtualBox VM) is
+  expected to see it more often; VirtualBox failures reported by the user are not analysed yet (logs pending).
