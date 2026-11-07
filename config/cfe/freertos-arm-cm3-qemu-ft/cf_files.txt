@@ -1,0 +1,4 @@
+# m2s-cfs: files added to the embedded /cf image (cf.tar) besides cfe_es_startup.scr:
+#   <name in /cf> <source relative to the cFE install directory exe/cpu1, from a first build pass>
+cfe_test_tbl.tbl cf/cfe_test_tbl.tbl
+sample_app_tbl.tbl cf/sample_app_tbl.tbl

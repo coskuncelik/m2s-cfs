@@ -3,7 +3,7 @@
 How the pinned NASA cFE and OSAL run on FreeRTOS V11.3.2 in this project. Current scope: steps 04a (OSAL core
 layer and the Linux simulator BSP), 04b (static RAM file system), 04c (all OSAL functional tests) and 05 (PSP and
 cFE core on the simulator), 05b (cFE's functional tests), 06 (`counter_app`), 07 (shareable bundle), 08 (Cortex-M3 cross-build on a placeholder board), 09 (Cortex-M3 run on QEMU
-`mps2-an385`) and 09b (OSAL functional tests on QEMU). The SmartFusion2 board files do not exist yet (D7). Decisions are in `DECISIONS.md`.
+`mps2-an385`), 09b (OSAL functional tests on QEMU) and 09c (cFE functional tests on QEMU). The SmartFusion2 board files do not exist yet (D7). Decisions are in `DECISIONS.md`.
 
 ## Layers
 
@@ -178,7 +178,12 @@ in the bundle, and this repository uses the defaults. `export/sample_defs` must 
 - OSAL test images (step 09b): OSAL built on its own with `config/osal/freertos-arm-cm3/toolchain.cmake`
   (shared settings in `cmake/arm-cm3-flags.cmake`, board `qemu-mps2-an385`, libraries in one ld group, one
   map per program). They link the test-only allocator because `ut_assert` uses `malloc`; flight images never.
-- QEMU runs with `-icount shift=auto,sleep=on,align=on` (D32): guest time from the instruction count, held to
+- Linker scripts place `.got`/`.got.plt` inside `.data` (D34): position-independent objects (OSAL's `ut_assert`)
+  reach globals through the GOT, which must be copied to RAM with the other initialised data.
+- cFE functional tests on the Cortex-M3 (step 09c): mission `freertos-arm-cm3-qemu-ft` (copy of the simulator's
+  functional-test mission, test-only allocator), comparison code shared with 05b in `scripts/lib/cfe-ft.sh`;
+  QEMU default timing there (D34).
+- QEMU runs with `-icount shift=auto,sleep=on,align=on` in steps 09 and 09b (D32): guest time from the instruction count, held to
   host real time. In QEMU's default mode SysTick follows the host clock and late ticks are never made up.
 - No heap at link time: `boards/common-cm3/syscalls.c` defines `malloc`/`free`/`calloc`/`realloc` and their newlib `_r` forms as traps;
   the toolchain's `-u` options make the linker take them from the kernel/board library before the C library, so

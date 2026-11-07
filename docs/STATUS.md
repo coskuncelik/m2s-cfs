@@ -1,6 +1,6 @@
 # Project status
 
-Last updated: 2026-11-06. Read this first when resuming. Rules: `CLAUDE.md`. Decisions: `docs/DECISIONS.md`.
+Last updated: 2026-11-07. Read this first when resuming. Rules: `CLAUDE.md`. Decisions: `docs/DECISIONS.md`.
 
 ## Steps
 
@@ -20,6 +20,7 @@ Last updated: 2026-11-06. Read this first when resuming. Rules: `CLAUDE.md`. Dec
 | **08 cross-build for Cortex-M3 (D31)** | **closed 2026-11-05 (user approved)** | `docs/test-results/08-cfe-arm-cm3-build.md` |
 | **09 cFE + counter_app on an emulated Cortex-M3, QEMU mps2-an385 (D32)** | **closed 2026-11-06 (user approved)** | `docs/test-results/09-cfe-arm-cm3-qemu.md` |
 | **09b OSAL functional tests on the emulated Cortex-M3, QEMU (D33)** | **closed 2026-11-06 (user approved)** | `docs/test-results/09b-osal-tests-arm-cm3-qemu.md` |
+| **09c cFE functional tests on the emulated Cortex-M3, QEMU (D34)** | **closed 2026-11-07 (user approved)** | `docs/test-results/09c-cfe-functional-tests-arm-cm3-qemu.md` |
 | SmartFusion2 target | not planned in detail yet (blocked by D7) | — |
 
 ## 04a: where it stands
@@ -144,6 +145,16 @@ passes on the Cortex-M3; only D26's 12 configuration failures allowed. Test heap
 allocator-origin check was updated for `alloc_traps.c` (first regression of 08/09 failed on that check only).
 Regression 08/09/04/06/05 pass (run 2026-11-06 evening, after the user stopped the first one for time).
 Closed and committed 2026-11-06 (user approved). Next: 09c (cFE functional tests on QEMU) when the user decides.
+
+## 09c: result
+
+Plan approved 2026-11-06 (copied functional-test overlay with a drift check, no allowed differences, ROUNDS=3,
+comparison code shared with 05b in `scripts/lib/cfe-ft.sh`). `./scripts/09c-run-cfe-functional-tests-arm-cm3-qemu.sh
+--clean` exit 0: 3/3 rounds, every one of 2521 assertions equal to native (2044 PASS, 0 FAIL, 13 MIR), no allowed
+difference — D29's `es_task_test.c:108` passes on the Cortex-M3. Found and fixed: `.got` outside `.data` in both
+board linker scripts (ut_assert is position-independent; its zero GOT made a memset clear the vector table →
+lock-up); new `.got` check in scripts 08/09/09c. QEMU default timing for 09c (user chose option A: with -icount a
+round took 25 min). Regression 08/09/05b/09b pass. Closed and committed 2026-11-07 (user approved). Next: to be decided with the user (K5 on hold; SF2 board step blocked by D7).
 
 ## Known issues on the VirtualBox VM host (recorded 2026-11-06, user decision: keep as known, not investigated)
 

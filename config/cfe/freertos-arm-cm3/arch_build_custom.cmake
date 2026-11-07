@@ -25,3 +25,7 @@ add_compile_options(
 set(CMAKE_C_LINK_EXECUTABLE
     "<CMAKE_C_COMPILER> <FLAGS> <CMAKE_C_LINK_FLAGS> <LINK_FLAGS> -Wl,-u,CFE_PSP_Main <OBJECTS> -o <TARGET> -Wl,--start-group <LINK_LIBRARIES> -Wl,--end-group")
 
+
+# Optional per-mission additions (a mission laid over this one, e.g. the functional-test mission
+# freertos-arm-cm3-qemu-ft, provides it).
+include("${CMAKE_CURRENT_LIST_DIR}/arch_build_extra.cmake" OPTIONAL)

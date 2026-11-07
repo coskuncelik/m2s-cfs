@@ -85,6 +85,7 @@ main() {
 
     cfe_sim_build "${DO_CLEAN}"
     check_image
+    check_got
     check_map
     check_no_heap
     cfe_sim_check_static_only

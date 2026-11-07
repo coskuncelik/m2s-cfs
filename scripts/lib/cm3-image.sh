@@ -63,6 +63,17 @@ check_image() {
     log "     vectors: SP = _estack, reset, SVCall/PendSV/SysTick -> FreeRTOS ARM_CM3 port handlers"
 }
 
+# A global offset table outside .data would never be copied to RAM (every entry 0 at run time).
+check_got() {
+    local bin="${EXE_DIR}/core-cpu1" hdr
+    hdr="$("${OBJDUMP}" -h "${bin}")"
+    if grep -Eq '^ +[0-9]+ \.got' <<<"${hdr}"; then
+        grep -E '^ +[0-9]+ \.got' <<<"${hdr}"
+        die "core-cpu1 has a .got/.got.plt output section outside .data (board.ld must place *(.got*) in .data)"
+    fi
+    log "OK   no .got/.got.plt outside .data (position-independent objects get their GOT copied with .data)"
+}
+
 check_map() {
     local map
     map="$(find "${WORK_DIR}/${ARCH_SUBDIR}" -name core-cpu1.map | head -1)"

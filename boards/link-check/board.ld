@@ -47,6 +47,11 @@ SECTIONS
     {
         _sdata = .;
         *(.data .data.*)
+        /* Global offset table of position-independent objects (OSAL's ut_assert is built with
+         * POSITION_INDEPENDENT_CODE): inside .data, so Reset_Handler copies its link-time addresses
+         * (outside it, every GOT entry would read 0 at run time). */
+        *(.got .got.*)
+        *(.got.plt)
         . = ALIGN(4);
         _edata = .;
     } > RAM AT > CODE
