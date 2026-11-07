@@ -14,13 +14,15 @@ EXPECTED_LINES=(
 ERROR_PATTERN='error|fail|panic|cannot|too small|abort|assert|could not|M2S (TRAP|FAULT|ASSERT|PANIC|STOP)'
 
 # Runs RUN_CMD (default ./core-cpu1) once in EXE_DIR; writes "<host seconds.micros> <line>" per output line to
-# $1 (a trailing CR, as sent by a UART console, is removed). Prints the exit status.
+# $1 (a trailing CR, as sent by a UART console, is removed). Prints the exit status. Standard input is
+# /dev/null: timeout runs the command in its own (background) process group, and a program that reads the
+# terminal from there is stopped by SIGTTIN (QEMU's -serial stdio does; seen when script 09 ran in a terminal).
 run_once() {
     local out="$1" rc
     set +e
     # RUN_CMD is a command line with arguments: word splitting is intended.
     # shellcheck disable=SC2086
-    (cd "${EXE_DIR}" && timeout -s INT "${RUN_SECONDS}" ${RUN_CMD:-./core-cpu1}) 2>&1 \
+    (cd "${EXE_DIR}" && timeout -s INT "${RUN_SECONDS}" ${RUN_CMD:-./core-cpu1} </dev/null) 2>&1 \
         | while IFS= read -r line; do printf '%s %s\n' "${EPOCHREALTIME}" "${line%$'\r'}"; done >"${out}"
     rc="${PIPESTATUS[0]}"
     set -e
@@ -69,7 +71,7 @@ check_run() {
     (( bad_seq == 0 )) || { echo "${bad_seq} counter value(s) out of sequence"; problems=$(( problems + 1 )); }
     (( bad_dt == 0 )) || { echo "${bad_dt} interval(s) outside 1 s +/- ${TOLERANCE_MS} ms"; problems=$(( problems + 1 )); }
 
-    echo "${count} counter lines, last ${values[count-1]:-none}, max interval deviation $(( max_dev / 1000 )).$(printf '%03d' $(( max_dev % 1000 ))) ms, drift ${drift} us over $(( count > 1 ? count - 1 : 0 )) s"
+    echo "${count} counter lines, last $( (( count > 0 )) && echo "${values[count-1]}" || echo none), max interval deviation $(( max_dev / 1000 )).$(printf '%03d' $(( max_dev % 1000 ))) ms, drift ${drift} us over $(( count > 1 ? count - 1 : 0 )) s"
     return $(( problems > 0 ))
 }
 

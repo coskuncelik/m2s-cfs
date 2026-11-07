@@ -65,3 +65,16 @@ unbuffered and nothing asked for heap memory.
   table is at 0.
 - OSAL functional tests and cFE functional tests on the Cortex-M3 (including D22's osal-core-test 02.003, which
   should pass where a task runs on its own stack) are not run yet (possible step 09b).
+
+## Fix 2026-11-07: QEMU stopped when the script ran in a terminal
+
+Reported by the user: `./scripts/09-run-cfe-arm-cm3-qemu.sh` in an interactive terminal failed 0/5 (empty run logs,
+"missing line ... OPERATIONAL"; plus `counter-check.sh: line 72: values: bad array subscript`). The runs here had
+passed because the agent's shell has no terminal on standard input.
+
+- Cause: QEMU's `-serial stdio` reads standard input; `timeout` runs QEMU in its own background process group, and
+  a background read from the terminal stops the process (SIGTTIN). Reproduced with a pseudo-terminal (`script`):
+  0 bytes of output with the terminal as stdin, output at once with stdin from `/dev/null`.
+- Fix: QEMU (and every command run by `scripts/lib/counter-check.sh`) gets stdin from `/dev/null`; also in
+  script 09b and, explicitly, `scripts/lib/cfe-ft.sh`. The summary line no longer indexes an empty counter list.
+- Verified with a terminal attached (`script -qec`): 09 5/5, 09b 75/75, 09c 3/3, 06 5/5, 05b 3/3, all exit 0.

@@ -139,7 +139,9 @@ run_tests() {
             name="${t##*/}"
             out="${RUN_DIR}/${name}.round${r}.log"
             rc=0
-            (cd "${BUILD_DIR}/${t%/*}" && timeout -s KILL "${RUN_TIMEOUT}" "${QEMU}" "${QEMU_ARGS[@]}" -kernel "${name}") 2>&1 \
+            # stdin /dev/null: QEMU's -serial stdio reads it, and from timeout's background process group a
+            # terminal read stops QEMU (SIGTTIN).
+            (cd "${BUILD_DIR}/${t%/*}" && timeout -s KILL "${RUN_TIMEOUT}" "${QEMU}" "${QEMU_ARGS[@]}" -kernel "${name}" </dev/null) 2>&1 \
                 | tr -d '\r' >"${out}" || rc="${PIPESTATUS[0]}"
             fails="$(grep -cE '^\[ *(FAIL|TSF|TTF)\]' "${out}" || true)"
             na="$(grep -cE '^\[ *N/A\]' "${out}" || true)"

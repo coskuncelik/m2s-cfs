@@ -28,6 +28,7 @@ NASA cFS/cFE on FreeRTOS Kernel V11.3.2, targeting:
 
 - `CLAUDE.md` — working rules
 - `docs/ARCHITECTURE.md` — how cFE and OSAL run on FreeRTOS (layers, design)
+- `docs/QEMU-RUN.md` — running the Cortex-M3 images in QEMU by hand (foreground, quit with Ctrl-A X, gdb)
 - `docs/VERSIONS.md` — exact source revisions
 - `docs/REFERENCES.md` — reference projects and findings
 - `docs/STATUS.md` — current progress and next actions

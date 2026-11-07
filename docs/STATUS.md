@@ -156,6 +156,14 @@ board linker scripts (ut_assert is position-independent; its zero GOT made a mem
 lock-up); new `.got` check in scripts 08/09/09c. QEMU default timing for 09c (user chose option A: with -icount a
 round took 25 min). Regression 08/09/05b/09b pass. Closed and committed 2026-11-07 (user approved). Next: to be decided with the user (K5 on hold; SF2 board step blocked by D7).
 
+## Fix 2026-11-07: QEMU scripts in a terminal
+
+Scripts 09/09b stopped QEMU when run from an interactive terminal (QEMU reads stdin from timeout's background
+process group → SIGTTIN; the agent's shell has no terminal, so it was not seen). Fixed: stdin from /dev/null
+(`scripts/lib/counter-check.sh`, script 09b, `scripts/lib/cfe-ft.sh`); empty-counter summary guarded. Verified with
+a terminal attached: 09, 09b, 09c, 06, 05b pass. Details: `docs/test-results/09-cfe-arm-cm3-qemu.md`. Running QEMU by hand in the foreground: `docs/QEMU-RUN.md`
+(commands checked 2026-11-07: counter_app with Ctrl-A X quit, queue-test ending QEMU with status 0). Committed 2026-11-07 (user approved).
+
 ## Known issues on the VirtualBox VM host (recorded 2026-11-06, user decision: keep as known, not investigated)
 
 Host `mpfs-devel`: VirtualBox VM, 2 vCPU, kernel 7.0.0-42, same Ubuntu/gcc/cmake as the Docker host. All scripts

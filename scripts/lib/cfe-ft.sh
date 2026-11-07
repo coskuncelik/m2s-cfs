@@ -53,7 +53,8 @@ assertions() {
 # then stops it with SIGINT. Prints the number of seconds taken; returns 1 on timeout.
 run_until() {
     local cmd="$1" dir="$2" out="$3" watch="$4" regex="$5" pid t=0
-    (cd "${dir}" && exec ${cmd}) >"${out}" 2>&1 &
+    # stdin /dev/null (explicit; a background job of a script gets it anyway): QEMU's -serial stdio reads stdin.
+    (cd "${dir}" && exec ${cmd}) </dev/null >"${out}" 2>&1 &
     pid=$!
     while kill -0 "${pid}" 2>/dev/null && (( t < RUN_TIMEOUT )); do
         if [[ -f "${watch}" ]] && grep -qE "${regex}" "${watch}"; then
