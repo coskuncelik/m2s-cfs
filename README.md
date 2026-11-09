@@ -5,6 +5,8 @@ NASA cFS/cFE on FreeRTOS Kernel V11.3.2, targeting:
 - a Linux simulator (FreeRTOS POSIX port), and
 - the Microchip SmartFusion2 M2S150-ADV-DEV-KIT (ARM Cortex-M3).
 
+`all_m2s.tar.gz` is stored with Git LFS. Run `git lfs pull` after cloning to download it.
+
 ## Quick start
 
 ```bash
