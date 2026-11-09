@@ -11,7 +11,7 @@
 # table images), copy them into M2S_CF_STAGE below as well.
 find_program(M2S_TAR_EXECUTABLE tar)
 if(NOT M2S_TAR_EXECUTABLE)
-    message(FATAL_ERROR "GNU tar is needed to build the /cf image (sample_defs/cf.tar)")
+    message(FATAL_ERROR "GNU tar is needed to build the /cf image (cf.tar in the mission config folder)")
 endif()
 set(M2S_CF_STAGE "${CMAKE_BINARY_DIR}/cf-image")
 file(REMOVE_RECURSE "${M2S_CF_STAGE}")

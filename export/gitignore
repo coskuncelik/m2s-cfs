@@ -1,5 +1,6 @@
 # cfs-m2s-freertos: replaces the cFS bundle .gitignore, which ignores Makefile and /sample_defs because
-# stock users copy them in; this bundle ships both.
+# stock users copy them in; this bundle ships Makefile and its own *_defs mission configurations.
 build
-/sample_defs/cf.tar
+build-*/
+/*_defs/cf.tar
 .DS_Store

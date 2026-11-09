@@ -18,8 +18,8 @@ NASA cFS/cFE on FreeRTOS Kernel V11.3.2, targeting:
 ./scripts/05-build-cfe-freertos-sim.sh --clean  # stock cFE core on FreeRTOS with the project PSP, 5 runs of 20 s
 ./scripts/05b-run-cfe-functional-tests-sim.sh --clean # cFE's functional tests on FreeRTOS, compared assertion by assertion with stock cFE on native Linux
 ./scripts/06-run-counter-app-sim.sh --clean     # counter_app on the simulator: start-up message + 1 Hz counter, 5 runs of 20 s
-./scripts/07-export-bundle.sh   # generate the shareable bundle build/export/cfs-m2s-freertos (stock cFS layout, no project history)
-./scripts/07-check-bundle.sh    # verify it: reproducible, upstream files unchanged, no private references, fresh clone builds and runs counter_app
+./scripts/07-export-bundle.sh   # generate the shareable bundle build/export/cfs-m2s-freertos (stock cFS layout; configs freertos_sim + freertos_qemu; committed on top of the published bundle, not pushed)
+./scripts/07-check-bundle.sh    # verify it: reproducible, upstream files unchanged, no private references, a fresh clone builds both configs and runs counter_app (simulator and QEMU)
 ./scripts/08-build-cfe-arm-cm3.sh --clean # cross-build cFE + counter_app for the Cortex-M3 (placeholder board): image, vectors, link map, no heap, footprint
 ./scripts/09-run-cfe-arm-cm3-qemu.sh --clean # same image for QEMU mps2-an385 (Cortex-M3): cFE + counter_app run on the emulated CPU, 5 runs of 20 s
 ./scripts/09b-run-osal-tests-arm-cm3-qemu.sh --clean # OSAL's 25 functional test programs on the emulated Cortex-M3 (QEMU), 3 rounds
@@ -55,4 +55,5 @@ command from script 01), and it runs on an emulated Cortex-M3 in QEMU (`mps2-an3
 same results there as on the simulator, and D22's simulator-only failure passes
 (`docs/test-results/09b-osal-tests-arm-cm3-qemu.md`); cFE's functional tests give exactly the native result there,
 with no allowed difference (`docs/test-results/09c-cfe-functional-tests-arm-cm3-qemu.md`). `scripts/07-export-bundle.sh` generates the shareable bundle `cfs-m2s-freertos` for the
-team (`docs/test-results/07-export-bundle.md`); `export/` holds the files that exist only in the bundle.
+team, with the simulator and the QEMU Cortex-M3 configurations (`docs/test-results/07-export-bundle.md`,
+`docs/test-results/07b-export-bundle-qemu.md`); `export/` holds the files that exist only in the bundle.

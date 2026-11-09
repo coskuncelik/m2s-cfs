@@ -28,15 +28,31 @@ bundle adds to or changes in the upstream trees.
  Linux host (pthreads, signals)     simulator only
 ```
 
-A board target keeps the top layers and replaces the BSP and PSP. It uses the `GCC/ARM_CM3` port instead of
-the POSIX port.
+The Cortex-M3 target (configuration `freertos_qemu`) keeps the top layers and replaces the bottom ones:
+
+```
+ cFE PSP "freertos-arm-cm3"         psp/fsw/freertos-arm-cm3              added
+   the simulator PSP sources + Cortex-M3 restart (SCB AIRCR) and panic
+ ─────────────────────────────────────────────────────────────────
+ OSAL BSP "freertos-arm-cm3"        osal/src/bsp/freertos-arm-cm3         added
+   main(), unbuffered stdout, start-up task, console -> board, assert/stack-overflow hooks, kernel build
+ ─────────────────────────────────────────────────────────────────
+ generic Cortex-M3 code             .../freertos-arm-cm3/boards/common-cm3   added
+   vector table, Reset_Handler, fault report, newlib stubs, allocator traps, "M2S ..." diagnostics
+ board "qemu-mps2-an385"            .../freertos-arm-cm3/boards/qemu-mps2-an385   added
+   m2s_board.h (clock, NVIC priority bits), board.c (UART console, exit), board.ld (memory map)
+ ─────────────────────────────────────────────────────────────────
+ FreeRTOS V11.3.2 kernel            FreeRTOS-Kernel/                      upstream, unmodified
+   GCC/ARM_CM3 port, no FreeRTOS heap
+```
 
 ## How the build finds the port
 
-- The toolchain file `sample_defs/toolchain-freertos-posix-sim.cmake` sets `OSAL_SYSTEM_OSTYPE=freertos`,
-  `OSAL_SYSTEM_BSPTYPE=freertos-posix-sim` and `CFE_SYSTEM_PSPNAME=freertos-posix-sim`.
-- OSAL then builds `osal/src/os/freertos` and `osal/src/bsp/freertos-posix-sim`, and cFE builds
-  `psp/fsw/freertos-posix-sim`. Both are found by the stock CMake rules.
+- Each configuration's toolchain file sets `OSAL_SYSTEM_OSTYPE=freertos` and the BSP and PSP names:
+  `freertos_sim_defs/toolchain-freertos-posix-sim.cmake` → `freertos-posix-sim`,
+  `freertos_qemu_defs/toolchain-freertos-arm-cm3.cmake` → `freertos-arm-cm3`.
+- OSAL then builds `osal/src/os/freertos` and `osal/src/bsp/<bsp>`, and cFE builds `psp/fsw/<psp>`. Both are
+  found by the stock CMake rules.
 - The BSP's `CMakeLists.txt` builds the kernel from `FreeRTOS-Kernel/`, with these parts:
   - `config/FreeRTOSConfig.h`;
   - the idle hook;
@@ -45,6 +61,13 @@ the POSIX port.
 
   The kernel is attached to `osal_public_api`, so everything that links OSAL also links FreeRTOS.
 - To use another kernel tree, set the CMake cache variable `M2S_FREERTOS_DIR`.
+- Cortex-M3: the toolchain file also names the board folder (`M2S_BOARD_DIR`, default
+  `boards/qemu-mps2-an385`) and the generic code (`M2S_CM3_COMMON_DIR`), and takes the compiler and linker
+  settings from `osal/src/bsp/freertos-arm-cm3/cmake/arm-cm3-flags.cmake`: `arm-none-eabi-gcc`,
+  `-mcpu=cortex-m3 -mthumb -mfloat-abi=soft`, newlib-nano, `-nostartfiles`, the board's linker script,
+  `--gc-sections`, a link map, and `-u` options that make the linker take the allocator entry points from the
+  traps before the C library. The BSP builds the kernel with the unmodified `GCC/ARM_CM3` port and
+  `config/FreeRTOSConfig.h`, which reads the clock and priority bits from the board's `m2s_board.h`.
 
 ## OS layer (`osal/src/os/freertos`)
 
@@ -63,17 +86,33 @@ the POSIX port.
 
 All FreeRTOS objects are created with the `*Static` APIs from memory defined in this layer.
 
-## PSP (`psp/fsw/freertos-posix-sim`)
+## PSP (`psp/fsw/freertos-posix-sim`, `psp/fsw/freertos-arm-cm3`)
+
+The Cortex-M3 PSP compiles the simulator PSP's portable sources (start-up and `/cf` image, reserved memory,
+watchdog, exceptions, SSR) with its own `cfe_psp_config.h`, plus its own `cfe_psp_support.c`.
 
 | Area | File | Design |
 |---|---|---|
 | Start-up | `cfe_psp_start.c` | Order: OSAL init → reserved memory map → `/cf` fixed map → embedded `/cf` image unpacked → PSP modules → `CFE_ES_Main`. The image is a POSIX ustar archive; regular files and directories are unpacked, and absolute paths, `..` and over-long names are refused. Every start is a power-on reset. |
 | Reserved memory | `cfe_psp_memory.c` | One static array (`CFE_PSP_FREERTOS_RESERVED_BYTES`, 4 MiB), laid out at start-up from the sizes cFE reports. Start-up stops if they do not fit. |
 | Time base | `psp/fsw/modules/timebase_freertos` | The FreeRTOS tick, extended to 64 bits; 1 ms resolution. |
-| Restart, panic | `cfe_psp_support.c` | End the simulator process. |
+| Restart, panic | `cfe_psp_support.c` | Simulator: end the process. Cortex-M3 (`psp/fsw/freertos-arm-cm3`): restart through the SCB AIRCR (`SYSRESETREQ`); panic prints `M2S PANIC` and stops. |
 | Watchdog, exceptions, SSR | `cfe_psp_watchdog.c`, `cfe_psp_exception.c`, `cfe_psp_ssr.c` | Stubs. |
 
-## Mission configuration (`sample_defs`)
+## Cortex-M3 board code (`osal/src/bsp/freertos-arm-cm3/boards`)
+
+| Part | File | Design |
+|---|---|---|
+| Start-up | `common-cm3/startup_cm3.c` | Vector table (16 core entries; SVCall, PendSV and SysTick go straight to the FreeRTOS port). `Reset_Handler` first quiesces what a boot loader may have left running (SysTick off, NVIC enables and pending bits cleared), sets VTOR, copies `.data` (with the GOT of position-independent objects), clears `.bss`, enables interrupts and calls `main()`. |
+| Faults | `common-cm3/startup_cm3.c` | One `M2S FAULT` line (exception number, CFSR, HFSR, MMFAR, BFAR, stacked PC/LR/xPSR), then halt. |
+| C library | `common-cm3/syscalls.c` | newlib stubs; `_write` goes to the board console; `_sbrk` traps. |
+| No heap | `common-cm3/alloc_traps.c` | `malloc`/`free`/`calloc`/`realloc` and the `_r` forms trap. `common-cm3/test_heap.c` is a static test-only allocator for test programs (CMake option `M2S_CM3_TEST_HEAP`, off in these configurations). |
+| Board | `qemu-mps2-an385/` | 25 MHz, 3 NVIC priority bits; code in SSRAM1 at 0, data/bss/main stack in PSRAM at `0x21000000`; console on the CMSDK UART0 (polled); exit through semihosting when QEMU allows it. |
+
+A new board is a new folder next to `qemu-mps2-an385` with the same three files (`m2s_board.h`, `board.c`,
+`board.ld`), selected with `M2S_BOARD_DIR` in the toolchain file.
+
+## Mission configurations (`freertos_sim_defs`, `freertos_qemu_defs`)
 
 - **Apps are linked statically.** `cpu1_STATIC_APPLIST counter_app`, and `cpu1_STATIC_SYMLIST` fills
   OSAL's static symbol table. ES loads the app by its cFE name from the startup script.
@@ -91,7 +130,7 @@ All FreeRTOS objects are created with the `*Static` APIs from memory defined in 
 
 ## Validation
 
-The port was tested on the simulator before export:
+The port was tested on both targets before export. On the simulator:
 
 - the OSAL functional and unit test programs (except the assertions for features this layer leaves out:
   network and loading modules from files);
@@ -102,5 +141,14 @@ The port was tested on the simulator before export:
 
 The only allowed difference is one assertion in `es_task_test.c`. It checks that a task's local variable
 lies inside the stack buffer given to it, and on the POSIX port it does not (see Limitations in `README.md`).
+
+On the Cortex-M3 under QEMU:
+
+- the image checks: ARMv7-M Thumb-2, entry point and vector table, no allocator or heap linked;
+- `counter_app` timing, with the same limits as on the simulator;
+- the same OSAL functional and unit test programs, with the same results, except that the stack-address
+  check passes here (a task runs on its own stack);
+- cFE's own functional tests: all 2521 assertions equal to stock cFE on native Linux, with no allowed
+  difference.
 
 These test setups are not part of this bundle.

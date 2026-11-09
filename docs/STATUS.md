@@ -1,6 +1,6 @@
 # Project status
 
-Last updated: 2026-11-07. Read this first when resuming. Rules: `CLAUDE.md`. Decisions: `docs/DECISIONS.md`.
+Last updated: 2026-11-09. Read this first when resuming. Rules: `CLAUDE.md`. Decisions: `docs/DECISIONS.md`.
 
 ## Steps
 
@@ -21,6 +21,7 @@ Last updated: 2026-11-07. Read this first when resuming. Rules: `CLAUDE.md`. Dec
 | **09 cFE + counter_app on an emulated Cortex-M3, QEMU mps2-an385 (D32)** | **closed 2026-11-06 (user approved)** | `docs/test-results/09-cfe-arm-cm3-qemu.md` |
 | **09b OSAL functional tests on the emulated Cortex-M3, QEMU (D33)** | **closed 2026-11-06 (user approved)** | `docs/test-results/09b-osal-tests-arm-cm3-qemu.md` |
 | **09c cFE functional tests on the emulated Cortex-M3, QEMU (D34)** | **closed 2026-11-07 (user approved)** | `docs/test-results/09c-cfe-functional-tests-arm-cm3-qemu.md` |
+| **07b bundle: simulator + QEMU Cortex-M3 configurations, history kept (D35)** | **closed 2026-11-09 (user approved); bundle published 2026-11-09: main = `ed41597`, tags `v1-sim`, `v2-sim-qemu`** | `docs/test-results/07b-export-bundle-qemu.md` |
 | SmartFusion2 target | not planned in detail yet (blocked by D7) | — |
 
 ## 04a: where it stands
@@ -163,6 +164,18 @@ process group → SIGTTIN; the agent's shell has no terminal, so it was not seen
 (`scripts/lib/counter-check.sh`, script 09b, `scripts/lib/cfe-ft.sh`); empty-counter summary guarded. Verified with
 a terminal attached: 09, 09b, 09c, 06, 05b pass. Details: `docs/test-results/09-cfe-arm-cm3-qemu.md`. Running QEMU by hand in the foreground: `docs/QEMU-RUN.md`
 (commands checked 2026-11-07: counter_app with Ctrl-A X quit, queue-test ending QEMU with status 0). Committed 2026-11-07 (user approved).
+
+## 07b: result
+
+Plan approved 2026-11-09 (configs `freertos_sim`/`freertos_qemu` selected with MISSIONCONFIG, option A: commit on
+top of the published bundle, cloning the public bundle allowed, tags `v1-sim`/`v2-sim-qemu`, no test configs).
+`./scripts/07-check-bundle.sh` exit 0: reproducible, upstream untouched, no private references (files and commit
+message), a fresh clone builds both configs, counter_app 5/5 on the simulator and 5/5 under QEMU. Fixed on the
+way: `<name>_perfids.h` per config; 3 s QEMU warm-up launch in the check (cold start took 5 s). Regression 06/09
+pass. Bundle pushed by the user 2026-11-09 (normal push, fine-grained token): github.com/coskuncelik/cfs-m2s-freertos
+`main` = `ed41597` on `d48850f`, tags `v1-sim` = `d48850f`, `v2-sim-qemu` = `ed41597`, verified with git ls-remote.
+Closed and committed 2026-11-09 (user approved). Next: to be decided with the user (K5 on hold; memory sizing;
+SF2 board step blocked by D7).
 
 ## Known issues on the VirtualBox VM host (recorded 2026-11-06, user decision: keep as known, not investigated)
 

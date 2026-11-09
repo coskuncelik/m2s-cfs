@@ -123,22 +123,27 @@ Mission `freertos-posix-sim-ft` links cFE's `cfe_assert` and `cfe_testcase`, NAS
 test log. After the tests, `ft_logdump` prints `/cf/cfe_test.log` as `FTLOG|`/`FTLOG+` lines; script 05b rebuilds the
 file, checks its size, and compares every assertion with stock cFE run natively with the same apps (D29).
 
-## Shareable bundle (step 07)
+## Shareable bundle (steps 07 and 07b)
 
-`scripts/07-export-bundle.sh` generates `cfs-m2s-freertos` (D30), a copy in the stock cFS bundle layout:
+`scripts/07-export-bundle.sh` generates `cfs-m2s-freertos` (D30, D35), a copy in the stock cFS bundle layout
+with two mission configurations:
 
 | Here | In the bundle |
 |---|---|
 | `osal-ext/freertos` | `osal/src/os/freertos` |
 | `osal-ext/freertos-posix-sim` + `cmake/freertos-posix-kernel.cmake`, `config/freertos/posix/*`, patch 0001 | `osal/src/bsp/freertos-posix-sim` (+ `cmake/`, `config/`, `patches/`) |
-| `psp-ext/fsw/freertos-posix-sim`, `psp-ext/fsw/modules/timebase_freertos` | `psp/fsw/...` |
+| `osal-ext/freertos-arm-cm3` + `cmake/freertos-arm-cm3-kernel.cmake`, `cmake/arm-cm3-flags.cmake`, `config/freertos/arm_cm3/*`, `boards/common-cm3`, `boards/qemu-mps2-an385` | `osal/src/bsp/freertos-arm-cm3` (+ `cmake/`, `config/`, `boards/`) |
+| `psp-ext/fsw/freertos-posix-sim`, `psp-ext/fsw/freertos-arm-cm3`, `psp-ext/fsw/modules/timebase_freertos` | `psp/fsw/...` |
 | `apps/counter_app` | `apps/counter_app` |
-| `config/cfe/freertos-posix-sim` (via the scripts) | `sample_defs/` (from `export/sample_defs`; `cf.tar` built by `mission_build_custom.cmake`) |
+| `config/cfe/freertos-posix-sim`, `config/cfe/freertos-arm-cm3(-qemu)` (via the scripts) | `freertos_sim_defs/`, `freertos_qemu_defs/` (stock `sample_defs` + `export/<name>_defs`; `<name>_perfids.h` = stock `sample_perfids.h`; `cf.tar` built by `mission_build_custom.cmake`) |
 | `sources/cFS`, `sources/FreeRTOS-Kernel` | top level, `FreeRTOS-Kernel/` |
 
-The kernel helper takes its kernel, config and patch locations from `M2S_FREERTOS_*` variables; the BSP sets them
-in the bundle, and this repository uses the defaults. `export/sample_defs` must be kept in step with
-`config/cfe/freertos-posix-sim` by hand; script `07-check-bundle.sh` builds and runs the bundle to catch drift.
+Users pick a configuration with `make MISSIONCONFIG=<name> O=<dir> prep`. The kernel helpers take their kernel
+and config locations from `M2S_FREERTOS_*` variables; the BSPs set them in the bundle, and this repository uses
+the defaults. The export is committed on top of the published bundle's `main` (a clone of it in
+`build/export/cfs-m2s-freertos`), with a team-facing message and version tags, so the team can `git pull`;
+pushing is separate and manual. `export/<name>_defs` must be kept in step with `config/cfe/...` by hand; script
+`07-check-bundle.sh` builds and runs both configurations from a fresh clone to catch drift.
 
 ## Cortex-M3 build and QEMU run (steps 08 and 09, D31, D32)
 

@@ -2,7 +2,9 @@
 # scripts/lib/counter-check.sh — counter_app run and output checks, shared by script 06 (project build) and
 # script 07-check-bundle (exported bundle) and script 09 (QEMU Cortex-M3). Sourced, not run. The caller sets
 # EXE_DIR (directory holding core-cpu1), RUN_DIR, RUNS, RUN_SECONDS, TOLERANCE_MS and DRIFT_MS, optionally
-# RUN_CMD (command run in EXE_DIR; default ./core-cpu1), and provides log and die.
+# RUN_CMD (command run in EXE_DIR; default ./core-cpu1) and RUN_WARMUP_SECONDS (default 0: one untimed launch
+# of RUN_CMD before the counted runs, output discarded, so a cold start of the program or emulator is not
+# counted), and provides log and die.
 
 # Fixed strings that must appear in each run.
 EXPECTED_LINES=(
@@ -80,6 +82,12 @@ run_counter_app() {
     local r rc out summary failed=0
     rm -rf "${RUN_DIR}"
     mkdir -p "${RUN_DIR}"
+    if (( ${RUN_WARMUP_SECONDS:-0} > 0 )); then
+        # Same stdin rule as run_once. Its output and exit status do not count.
+        # shellcheck disable=SC2086
+        (cd "${EXE_DIR}" && timeout -s INT "${RUN_WARMUP_SECONDS}" ${RUN_CMD:-./core-cpu1} </dev/null) >/dev/null 2>&1 || true
+        log "     warm-up launch (${RUN_WARMUP_SECONDS} s, not counted)"
+    fi
     for (( r = 1; r <= RUNS; r++ )); do
         out="${RUN_DIR}/run${r}.log"
         rc="$(run_once "${out}")"
