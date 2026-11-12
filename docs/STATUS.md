@@ -189,8 +189,17 @@ timing), 10 (stacks ≥ 34 % free), 09c 3/3 equal to native, 09b 75/75, 06 5/5, 
 **Open: `07-check-bundle` exit 1**, not caused by step 10: the bundle's `PORTING.md` records the m2s-cfs
 revision, so every commit after the published export changes the bundle; the export then moves the local tag
 `v2-sim-qemu` and the check's second export cannot fetch the published tag ("would clobber existing tag").
-Fixing it is a change to the step 07 scripts; user decision 2026-11-12: left open for now. The generated clone's tag was reset to `ed41597`.
+Fixing it is a change to the step 07 scripts; user decision 2026-11-12: left open for now (fixed later the same day, see "Fix 2026-11-12: 07 export/check"). The generated clone's tag was reset to `ed41597`.
 Details: `docs/test-results/10-memory-sizing.md`. Closed and committed 2026-11-12 (user approved).
+
+## Fix 2026-11-12: 07 export/check (D35a)
+
+Plan approved 2026-11-12. `07-export-bundle.sh`: generated clone's tags reset to the published ones; a published
+tag is never moved; the PORTING.md revision is the last commit touching the exported inputs. `07-check-bundle.sh`
+accepts an unchanged bundle too. Verified: export recovers from a moved local tag; a docs edit leaves the bundle
+tree unchanged; `07-check-bundle.sh` exit 0 (both configurations 5/5); published repository unchanged. The export
+now makes one local, untagged bundle commit (PORTING.md revision line only), not pushed. Details:
+`docs/test-results/07b-export-bundle-qemu.md`. Committed 2026-11-12 (user approved).
 
 ## Known issues on the VirtualBox VM host (recorded 2026-11-06, user decision: keep as known, not investigated)
 

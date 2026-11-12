@@ -58,3 +58,21 @@ image: text 213475, data 1296, bss 7568796 bytes.
   = `d48850f`, `v2-sim-qemu` = `ed41597`, verified with `git ls-remote`. Not checked: a teammate's host.
 - Teammates with an existing clone must delete their old `build/` folder (the README says so).
 - The board configuration `freertos_m2s` comes with the board step.
+
+## Fix 2026-11-12: export after later m2s-cfs commits (D35a)
+
+Cause: `07-check-bundle.sh` failed (exit 1, "cannot fetch") since the m2s-cfs commits after the published export:
+PORTING.md recorded m2s-cfs `HEAD`, so every commit changed the bundle; the export then moved the local tag
+`v2-sim-qemu` onto its new commit, and the check's second export could not fetch the published tag ("would
+clobber existing tag"). Fixed in `scripts/07-export-bundle.sh` and `scripts/07-check-bundle.sh` (D35a).
+
+| Check | Result |
+|---|---|
+| Clone prepared with `v2-sim-qemu` moved to a local commit and an extra local tag `v9-local`: export exit 0; afterwards `v2-sim-qemu` = `ed41597` (published), `v9-local` gone; new local commit `45c547c` (PORTING.md revision line only) left untagged: "NOT tagged v2-sim-qemu: published on ed41597de81e" | PASS |
+| Revision line: `4a2c8b0d9dff-dirty` (last commit touching the exported inputs; dirty = the uncommitted export script fix) instead of m2s-cfs HEAD `ed55ab5` | PASS |
+| Temporary uncommitted edit of `docs/REFERENCES.md` (restored afterwards): bundle tree unchanged (`41049e659982` before and after) | PASS |
+| `./scripts/07-check-bundle.sh` exit 0: two exports same tree `41049e659982`, commit on published main `ed41597`; 3149 upstream files identical; no private references; fresh clone builds `freertos_sim` and `freertos_qemu`; simulator counter_app 5/5; QEMU image checks and counter_app 5/5 | PASS |
+| Published repository unchanged (`git ls-remote`): main = `v2-sim-qemu` = `ed41597`, `v1-sim` = `d48850f`; nothing pushed | PASS |
+
+Not exercised: the "bundle unchanged" branch of the check (it needs a published bundle equal to the export).
+The local bundle commit (PORTING.md revision line only) is not pushed; publishing it would need a new tag.

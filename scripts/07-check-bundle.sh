@@ -2,8 +2,8 @@
 # 07-check-bundle.sh — verify the shareable bundle cfs-m2s-freertos (steps 07 and 07b, D30, D35).
 #
 # Checks:
-#   1. two exports (scripts/07-export-bundle.sh) give the same git tree; the bundle commit sits directly on
-#      the published main (history kept, no force push needed);
+#   1. two exports (scripts/07-export-bundle.sh) give the same git tree; the bundle is either unchanged
+#      against the published main or one commit directly on it (history kept, no force push needed);
 #   2. every upstream file in the bundle is byte-identical to the pinned working tree, except the listed
 #      changes; the bundle has no file outside upstream + added + generated;
 #   3. no private references (the export checks this; repeated here on the committed files);
@@ -56,9 +56,14 @@ check_reproducible() {
     "${SCRIPT_DIR}/07-export-bundle.sh" >/dev/null
     t2="$(git -C "${BUNDLE}" rev-parse 'HEAD^{tree}')"
     [[ "${t1}" == "${t2}" ]] || die "two exports gave different trees (${t1} / ${t2})"
-    [[ "$(git -C "${BUNDLE}" rev-parse HEAD^)" == "$(git -C "${BUNDLE}" rev-parse origin/main)" ]] \
-        || die "the bundle commit is not directly on the published main"
-    log "OK   two exports give the same tree ${t2:0:12}; commit $(git -C "${BUNDLE}" rev-parse --short=12 HEAD) on published main $(git -C "${BUNDLE}" rev-parse --short=12 origin/main)"
+    # Either unchanged (HEAD is the published main) or one new commit directly on it (D35a).
+    if [[ "$(git -C "${BUNDLE}" rev-parse HEAD)" == "$(git -C "${BUNDLE}" rev-parse origin/main)" ]]; then
+        log "OK   two exports give the same tree ${t2:0:12}; bundle unchanged against published main $(git -C "${BUNDLE}" rev-parse --short=12 origin/main)"
+    else
+        [[ "$(git -C "${BUNDLE}" rev-parse HEAD^)" == "$(git -C "${BUNDLE}" rev-parse origin/main)" ]] \
+            || die "the bundle commit is not directly on the published main"
+        log "OK   two exports give the same tree ${t2:0:12}; commit $(git -C "${BUNDLE}" rev-parse --short=12 HEAD) on published main $(git -C "${BUNDLE}" rev-parse --short=12 origin/main)"
+    fi
 }
 
 check_upstream_identical() {

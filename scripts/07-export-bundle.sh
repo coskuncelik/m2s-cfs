@@ -58,6 +58,10 @@ LOG_FILE="${LOG_DIR}/07-export-bundle.log"
 PROJECT_PATHS=(osal-ext psp-ext apps/counter_app cmake/freertos-posix-kernel.cmake config/freertos/posix
                patches/freertos-kernel export boards/common-cm3 boards/qemu-mps2-an385
                cmake/freertos-arm-cm3-kernel.cmake cmake/arm-cm3-flags.cmake config/freertos/arm_cm3)
+# Inputs that shape the bundle: the exported paths plus this script (README, PORTING, replacements). The
+# source revision in PORTING.md is the last commit that touched them, so commits elsewhere in this repository
+# (documents, other steps) do not change the bundle (D35a). Upstream versions are listed separately.
+REVISION_PATHS=("${PROJECT_PATHS[@]}" scripts/07-export-bundle.sh)
 
 # Mission configurations shipped (cFE selects one with MISSIONCONFIG=<name>; folder <name>_defs).
 CONFIGS=(freertos_sim freertos_qemu)
@@ -312,8 +316,9 @@ PYEOF
 # Appends the generated sections to PORTING.md.
 write_porting_lists() {
     local porting="${OUT_DIR}/PORTING.md" rev dirty="" d f
-    rev="$(git -C "${ROOT_DIR}" rev-parse --short=12 HEAD)"
-    [[ -z "$(git -C "${ROOT_DIR}" status --porcelain -- "${PROJECT_PATHS[@]}")" ]] || dirty="-dirty"
+    rev="$(git -C "${ROOT_DIR}" log -1 --format=%h --abbrev=12 -- "${REVISION_PATHS[@]}")"
+    [[ -n "${rev}" ]] || die "no commit touches the exported paths"
+    [[ -z "$(git -C "${ROOT_DIR}" status --porcelain -- "${REVISION_PATHS[@]}")" ]] || dirty="-dirty"
     {
         printf '\n## Pinned versions (generated)\n\n'
         printf '| Component | Commit | Version |\n|---|---|---|\n'
@@ -370,10 +375,12 @@ check_leaks() {
 }
 
 # REPO_DIR: a clone of the published bundle, on its main branch (fetched again on every run). It is a
-# generated working copy: local changes in it are discarded.
+# generated working copy: local changes in it are discarded and its tags are replaced by the published ones
+# (an earlier unpushed export may have tagged its own commit).
 prepare_repo() {
     if [[ -d "${REPO_DIR}/.git" ]] && [[ "$(git -C "${REPO_DIR}" remote get-url origin 2>/dev/null || true)" == "${BUNDLE_URL}" ]]; then
-        git -C "${REPO_DIR}" fetch -q --tags origin main || die "cannot fetch ${BUNDLE_URL}"
+        git -C "${REPO_DIR}" tag -l | xargs -r git -C "${REPO_DIR}" tag -d >/dev/null
+        git -C "${REPO_DIR}" fetch -q --force --tags origin main || die "cannot fetch ${BUNDLE_URL}"
     else
         rm -rf "${REPO_DIR}"
         git clone -q "${BUNDLE_URL}" "${REPO_DIR}" || die "cannot clone ${BUNDLE_URL}"
@@ -386,9 +393,10 @@ prepare_repo() {
 }
 
 # Replaces the files of REPO_DIR with the generated bundle and commits on top of origin/main if anything
-# changed. Tags: BASE_TAG on the first published commit, BUNDLE_TAG on the result.
+# changed. Tags: BASE_TAG on the first published commit, BUNDLE_TAG on the result unless BUNDLE_TAG is
+# already published on another commit (a published tag is never moved; a new version needs a new BUNDLE_TAG).
 commit_bundle() {
-    local name email
+    local name email published tag_note
     find "${REPO_DIR}" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
     cp -a "${OUT_DIR}/." "${REPO_DIR}/"
     git -C "${REPO_DIR}" add -A
@@ -406,9 +414,16 @@ commit_bundle() {
     name="$(git -C "${ROOT_DIR}" config user.name)"
     email="$(git -C "${ROOT_DIR}" config user.email)"
     git -C "${REPO_DIR}" -c user.name="${name}" -c user.email="${email}" commit -q -m "${BUNDLE_TITLE}" -m "${BUNDLE_BODY}"
-    git -C "${REPO_DIR}" tag -f "${BUNDLE_TAG}" HEAD >/dev/null
+    # After the forced fetch, a local BUNDLE_TAG is the published one (if any).
+    published="$(git -C "${REPO_DIR}" rev-parse -q --verify "refs/tags/${BUNDLE_TAG}^{commit}" || true)"
+    if [[ -n "${published}" ]]; then
+        tag_note="tag ${BASE_TAG}; NOT tagged ${BUNDLE_TAG}: published on ${published:0:12} (set BUNDLE_TAG, BUNDLE_TITLE and BUNDLE_BODY for a new version)"
+    else
+        git -C "${REPO_DIR}" tag "${BUNDLE_TAG}" HEAD
+        tag_note="tags ${BASE_TAG}, ${BUNDLE_TAG}"
+    fi
     log "OK   bundle commit $(git -C "${REPO_DIR}" rev-parse --short=12 HEAD) on top of $(git -C "${REPO_DIR}" rev-parse --short=12 origin/main):" \
-        "$(git -C "${REPO_DIR}" diff --shortstat origin/main HEAD); tags ${BASE_TAG}, ${BUNDLE_TAG}"
+        "$(git -C "${REPO_DIR}" diff --shortstat origin/main HEAD); ${tag_note}"
     log "     ${REPO_DIR}: $(git -C "${REPO_DIR}" ls-files | wc -l) files, tree $(git -C "${REPO_DIR}" rev-parse --short=12 'HEAD^{tree}'); not pushed"
 }
 
