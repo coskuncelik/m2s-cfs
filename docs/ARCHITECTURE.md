@@ -193,8 +193,21 @@ pushing is separate and manual. `export/<name>_defs` must be kept in step with `
 - No heap at link time: `boards/common-cm3/syscalls.c` defines `malloc`/`free`/`calloc`/`realloc` and their newlib `_r` forms as traps;
   the toolchain's `-u` options make the linker take them from the kernel/board library before the C library, so
   newlib-nano's allocator (referenced by its printf core and stdio) is never linked and `_sbrk` is discarded.
-- Memory sizes are still the simulator's (bss about 7.6 MB, mostly PSP reserved memory 4 MiB, OSAL RAM pool
-  1 MiB, cFE table and SB globals, OSAL queue table); they must be cut to the board's RAM later.
+- Memory sizes of the flight configuration (step 10, D36): data + bss + main stack 500,396 bytes against a
+  provisional budget of 512 KiB, checked by scripts 08 and 09 (`check_ram_budget`, `RAM_BUDGET_BYTES`). The sizes
+  live in `config/cfe/freertos-arm-cm3/`:
+  - `m2s_osal_sizing.cmake` (OSAL limits: 24 tasks, 16 queues, 16 open files, 64 console lines), included by
+    `freertos-arm-cm3_osconfig.cmake`;
+  - `m2s_sizing.cmake` (`-D` settings of the OS layer and PSP: stack pools 4 KiB × 12 + 8 KiB × 2, 1 KiB per
+    queue, 2 KiB timebase stacks, 4 KiB RAM-disk pool, 16 KiB `/cf` root, 128 KiB PSP reserved block),
+    included by `arch_build_custom.cmake`; the BSP main task keeps 16 KiB;
+  - `cfe_{es,sb,tbl,time}_internal_cfg.h`: include cFE's stock `default_cfe_*_internal_cfg.h` and redefine single
+    values (4 KiB core task stacks, 16 KiB CDS, 64 KiB volatile disk, 1025-entry performance log, 16 pipes, 64 KiB
+    SB and TBL pools, 2 simultaneous table loads, 32 tables); `global_build_options.cmake` puts the stock config
+    folders on the include path for both cFE build levels.
+  The functional-test overlay `freertos-arm-cm3-qemu-ft` replaces these files with ones that keep the default
+  sizes; the OSAL test build (09b, `config/osal/freertos-arm-cm3/osal_config.cmake`) is not affected. Stack sizes
+  are measured at `-O0` (the build has no optimisation flag) with `scripts/10-memory-report.sh`.
 
 ## Host-side versus embedded memory
 

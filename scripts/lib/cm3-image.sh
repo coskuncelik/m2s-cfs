@@ -119,3 +119,23 @@ check_no_heap() {
     log "OK   no allocator and no heap linked: newlib allocator objects absent from the map;"
     log "     present only as the traps (alloc_traps.c, _sbrk in syscalls.c): ${defined[*]:-none}"
 }
+
+# RAM budget of the flight image (step 10, D36): .data + .bss + .main_stack must not exceed RAM_BUDGET_BYTES
+# (default 524288 = 512 KiB, provisional until the SmartFusion2 memory map is known, D7). Flight images only
+# (scripts 08 and 09); the test images (09b, 09c) keep larger sizes.
+check_ram_budget() {
+    local bin="${EXE_DIR}/core-cpu1" budget="${RAM_BUDGET_BYTES:-524288}" used
+    [[ "${budget}" =~ ^[1-9][0-9]*$ ]] || die "RAM_BUDGET_BYTES must be a positive integer (got '${budget}')"
+    # readelf -SW: "[ N] name type addr off size ..." (the index may split into two fields).
+    used="$("${READELF}" -SW "${bin}" | awk '
+        { for (i = 1; i < NF; i++) if ($i == ".data" || $i == ".bss" || $i == ".main_stack") {
+              x = $(i + 4); v = 0
+              for (j = 1; j <= length(x); j++) v = v * 16 + index("0123456789abcdef", substr(x, j, 1)) - 1
+              s += v; n++ } }
+        END { if (n == 3) print s }')"
+    [[ -n "${used}" ]] || die "core-cpu1: .data, .bss or .main_stack section not found"
+    if (( used > budget )); then
+        die "RAM budget exceeded: .data + .bss + .main_stack = ${used} bytes > ${budget} (RAM_BUDGET_BYTES, D36)"
+    fi
+    log "OK   RAM budget: .data + .bss + .main_stack = ${used} bytes <= ${budget} ($(( used * 100 / budget )) %)"
+}

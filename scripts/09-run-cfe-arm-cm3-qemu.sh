@@ -8,14 +8,15 @@
 # Checks:
 #   1. QEMU's mps2-an385 memory map still matches board.ld (SSRAM1 at 0, PSRAM at 0x21000000, UART0);
 #   2. build + install with cFE's strict flags; the step 08 image checks on this image (ELF/ARMv7-M Thumb-2,
-#      entry, vector table, link map, no allocator or heap linked, no target object referencing malloc/free);
+#      entry, vector table, link map, no allocator or heap linked, no target object referencing malloc/free;
+#      RAM budget .data + .bss + .main_stack <= RAM_BUDGET_BYTES, default 512 KiB, D36);
 #   3. RUNS runs of RUN_SECONDS under QEMU (-icount shift=auto,sleep=on,align=on), each checked like script 06: ES loads COUNTER_APP, OPERATIONAL,
 #      "counter_app initialized" once, counter 1..N without gap, every interval 1 s +/- TOLERANCE_MS, drift
 #      within DRIFT_MS, no error line and no "M2S TRAP/FAULT/ASSERT/PANIC/STOP" line;
 #   4. sources/ unchanged.
 #
 # Usage: ./scripts/09-run-cfe-arm-cm3-qemu.sh [--clean]
-#        Environment: RUNS (default 5), RUN_SECONDS (20), TOLERANCE_MS (50), DRIFT_MS (10).
+#        Environment: RUNS (default 5), RUN_SECONDS (20), TOLERANCE_MS (50), DRIFT_MS (10), RAM_BUDGET_BYTES (524288).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -101,6 +102,7 @@ main() {
     check_got
     check_map
     check_no_heap
+    check_ram_budget
     cfe_sim_check_static_only
     run_counter_app
 

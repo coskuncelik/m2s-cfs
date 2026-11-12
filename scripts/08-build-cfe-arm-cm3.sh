@@ -16,10 +16,12 @@
 #   4. no dynamic allocation: newlib's allocator objects are not linked; malloc/free/calloc/realloc, their
 #      _r forms and _sbrk exist only as the board's traps (syscalls.c, per the link map); no FreeRTOS heap
 #      or dynamic FreeRTOS object creation; no target object references malloc/free;
+#   4b. RAM budget: .data + .bss + .main_stack <= RAM_BUDGET_BYTES (default 512 KiB, D36);
 #   5. footprint report: sections, the 20 largest RAM symbols, comparison with the simulator build;
 #   6. sources/ unchanged.
 #
 # Usage: ./scripts/08-build-cfe-arm-cm3.sh [--clean]
+#        Environment: RAM_BUDGET_BYTES (default 524288).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -88,6 +90,7 @@ main() {
     check_got
     check_map
     check_no_heap
+    check_ram_budget
     cfe_sim_check_static_only
     footprint_report
 

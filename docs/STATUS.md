@@ -1,6 +1,6 @@
 # Project status
 
-Last updated: 2026-11-09. Read this first when resuming. Rules: `CLAUDE.md`. Decisions: `docs/DECISIONS.md`.
+Last updated: 2026-11-12. Read this first when resuming. Rules: `CLAUDE.md`. Decisions: `docs/DECISIONS.md`.
 
 ## Steps
 
@@ -22,6 +22,7 @@ Last updated: 2026-11-09. Read this first when resuming. Rules: `CLAUDE.md`. Dec
 | **09b OSAL functional tests on the emulated Cortex-M3, QEMU (D33)** | **closed 2026-11-06 (user approved)** | `docs/test-results/09b-osal-tests-arm-cm3-qemu.md` |
 | **09c cFE functional tests on the emulated Cortex-M3, QEMU (D34)** | **closed 2026-11-07 (user approved)** | `docs/test-results/09c-cfe-functional-tests-arm-cm3-qemu.md` |
 | **07b bundle: simulator + QEMU Cortex-M3 configurations, history kept (D35)** | **closed 2026-11-09 (user approved); bundle published 2026-11-09: main = `ed41597`, tags `v1-sim`, `v2-sim-qemu`** | `docs/test-results/07b-export-bundle-qemu.md` |
+| **10 memory sizing of the Cortex-M3 flight image (D36)** | **closed 2026-11-12 (user approved; option A); 07-check-bundle failure left open (pre-existing export issue)** | `docs/test-results/10-memory-sizing.md` |
 | SmartFusion2 target | not planned in detail yet (blocked by D7) | — |
 
 ## 04a: where it stands
@@ -176,6 +177,20 @@ pass. Bundle pushed by the user 2026-11-09 (normal push, fine-grained token): gi
 `main` = `ed41597` on `d48850f`, tags `v1-sim` = `d48850f`, `v2-sim-qemu` = `ed41597`, verified with git ls-remote.
 Closed and committed 2026-11-09 (user approved). Next: to be decided with the user (K5 deferred; memory sizing;
 SF2 board step blocked by D7).
+
+## 10: where it stands
+
+Plan approved 2026-11-12 (D36: provisional budget data + bss ≤ 512 KiB, flight Cortex-M3 configuration only,
+measure first; `-O0` kept). Phase 1: `scripts/10-memory-report.sh` (+ `--ft` under the cFE functional tests,
+`scripts/lib/mem-probe-gdb.py`). Phase 2 (D36a) done with option A (bundle sources unchanged, BSP main task
+keeps 16 KiB): flight RAM 7.57 MB → 500,396 bytes (95 % of 512 KiB), budget check in scripts 08/09. Verified:
+08 (a too-low budget fails), 09 10/10 (two earlier runs 4/5: one late/early console line pair each, host
+timing), 10 (stacks ≥ 34 % free), 09c 3/3 equal to native, 09b 75/75, 06 5/5, 05b 3/3.
+**Open: `07-check-bundle` exit 1**, not caused by step 10: the bundle's `PORTING.md` records the m2s-cfs
+revision, so every commit after the published export changes the bundle; the export then moves the local tag
+`v2-sim-qemu` and the check's second export cannot fetch the published tag ("would clobber existing tag").
+Fixing it is a change to the step 07 scripts; user decision 2026-11-12: left open for now. The generated clone's tag was reset to `ed41597`.
+Details: `docs/test-results/10-memory-sizing.md`. Closed and committed 2026-11-12 (user approved).
 
 ## Known issues on the VirtualBox VM host (recorded 2026-11-06, user decision: keep as known, not investigated)
 
