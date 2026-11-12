@@ -174,7 +174,7 @@ message), a fresh clone builds both configs, counter_app 5/5 on the simulator an
 way: `<name>_perfids.h` per config; 3 s QEMU warm-up launch in the check (cold start took 5 s). Regression 06/09
 pass. Bundle pushed by the user 2026-11-09 (normal push, fine-grained token): github.com/coskuncelik/cfs-m2s-freertos
 `main` = `ed41597` on `d48850f`, tags `v1-sim` = `d48850f`, `v2-sim-qemu` = `ed41597`, verified with git ls-remote.
-Closed and committed 2026-11-09 (user approved). Next: to be decided with the user (K5 on hold; memory sizing;
+Closed and committed 2026-11-09 (user approved). Next: to be decided with the user (K5 deferred; memory sizing;
 SF2 board step blocked by D7).
 
 ## Known issues on the VirtualBox VM host (recorded 2026-11-06, user decision: keep as known, not investigated)
@@ -192,6 +192,34 @@ Host `mpfs-devel`: VirtualBox VM, 2 vCPU, kernel 7.0.0-42, same Ubuntu/gcc/cmake
 
 Rule of thumb: on this VM a single failure of K1–K4 is expected and is not a new bug. K5 (and any stall where the
 clock still runs) should be treated as a possible real defect.
+
+### K5: deferred (user decision 2026-11-12)
+
+Not being worked on for now; may be picked up later. K5 stays open and unexplained. The investigation plan
+drafted 2026-11-06 (never approved or started) is kept here so it is not lost:
+
+- **Facts from `sb_performance_test.c:531-600` and the recorded counts:** `CmdXmit`/`TlmXmit` (prio 150) wait on
+  their own counting semaphore with no timeout; `CmdRecv`/`TlmRecv` (prio 100) call `CFE_SB_ReceiveBuffer(..., 5000)`.
+  The 5 s receive timeout never fired, and sent − received = 8 (the pipeline depth) in both pairs, so the receivers
+  had messages and still did not read them. Both pairs froze together; they share only the SB lock and the scheduler.
+- **Leading hypothesis:** receivers blocked on something without a timeout (SB lock or a lock in our OSAL queue
+  code) whose holder never runs again or never releases it: (a) our OSAL code (would also hit the Cortex-M3), or
+  (b) the FreeRTOS POSIX port / tick patch 0001 (simulator only).
+- **Phase 0:** get the VM's `logs/05b-cfe-ft/freertos-round3-console.log` if it still exists; point the stale notes
+  (05b re-run section above, "logs to be sent"; `docs/test-results/05b-cfe-functional-tests-sim.md`, "not analysed
+  yet") to K5.
+- **Phase 1 (desk review):** every blocking path the test uses — OSAL queue get/put and their staging mutexes,
+  mutexes, counting semaphores, object-table lock; cFE SB transmit/receive/allocate/release and the SB lock;
+  patch 0001 and the port's suspend/resume path.
+- **Phase 2 (fast reproducer, test-only):** app `apps/sb_stress/` in a mission `freertos-posix-sim-stress` repeating
+  the 4-task pattern with a watchdog (no progress for 10 s → dump FreeRTOS task states via `uxTaskGetSystemState`,
+  mutex holders, queue fill levels, and what each task blocks on via a compile-time `OS_FREERTOS_DEBUG_BLOCKING`
+  hook, off by default); script `scripts/k5-sb-stress-sim.sh`, optionally under gdb as its own child on the VM.
+- **Phase 3:** stop and report; fix our OSAL code, or fix/record the port/patch 0001 cause, or record the
+  no-reproduction run time.
+- **Phase 4:** ~1 h stress run on each host, 05b with `ROUNDS=10` on both, regression 04/05/06/07, docs.
+- **Risks:** may only reproduce on the VM (0 stalls in ~30 rounds on the Docker host); instrumentation may hide the
+  race; the reproducer may not hit the same path (fallback: 05b in a long loop on the VM).
 
 ## Environment facts that matter
 - Current host (since 2026-11-04): Docker container, 2 vCPU Xeon Platinum 8370C, Ubuntu 24.04.5. No effective
