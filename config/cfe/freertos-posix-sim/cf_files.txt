@@ -2,3 +2,4 @@
 #   <name in /cf> <source: path relative to the cFE install directory exe/cpu1, from a first build pass>
 # Used by scripts/lib/cfe-sim.sh. sch_lab loads its schedule table from this file (step 11c, D39).
 sch_lab_table.tbl cf/sch_lab_table.tbl
+to_lab_sub.tbl cf/to_lab_sub.tbl
