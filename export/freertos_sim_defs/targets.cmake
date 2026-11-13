@@ -17,8 +17,8 @@ SET(cpu1_FILELIST)
 
 # Apps linked into core-cpu1. The symbol list feeds OSAL's static loader: the module name must equal the
 # cFE name in the startup script (4th field), e.g. COUNTER_APP.
-SET(cpu1_STATIC_APPLIST counter_app)
-SET(cpu1_STATIC_SYMLIST "COUNTER_APP_Main,COUNTER_APP")
+SET(cpu1_STATIC_APPLIST sample_lib counter_app)
+SET(cpu1_STATIC_SYMLIST "SAMPLE_LIB_Init,SAMPLE_LIB" "COUNTER_APP_Main,COUNTER_APP")
 
 # /cf image embedded in the executable; the PSP unpacks it into /cf at start-up. cf.tar is generated at
 # configure time by mission_build_custom.cmake from cpu1_cfe_es_startup.scr.

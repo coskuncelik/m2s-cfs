@@ -21,8 +21,8 @@ SET(cpu1_APPLIST)                     # no dynamically loaded apps
 SET(cpu1_FILELIST)
 
 # Apps linked into core-cpu1; the symbol list feeds OSAL's static loader (module name = cFE name).
-SET(cpu1_STATIC_APPLIST counter_app)
-SET(cpu1_STATIC_SYMLIST "COUNTER_APP_Main,COUNTER_APP")
+SET(cpu1_STATIC_APPLIST sample_lib counter_app)
+SET(cpu1_STATIC_SYMLIST "SAMPLE_LIB_Init,SAMPLE_LIB" "COUNTER_APP_Main,COUNTER_APP")
 
 # /cf image embedded in the executable; the PSP unpacks it into /cf at start-up.
 SET(cpu1_EMBED_FILELIST "CFE_PSP_CF_IMAGE,cf.tar")

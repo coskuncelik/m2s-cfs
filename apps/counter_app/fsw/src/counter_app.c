@@ -10,17 +10,21 @@
  * OS_TaskDelay(1000). OS_TaskDelay waits at least the time asked, up to one tick more, so plain delays
  * drift (about 1 ms per second measured on the simulator); deadlines keep the error within about a tick.
  *
- * Events (step 11a, D37): EVS events for start-up and the file test (counter_app_events.h); EVS port 1 prints
- * them on the console. The OS_printf lines stay: the run checks (scripts/lib/counter-check.sh) time them.
+ * Events: EVS events for start-up, the file test and the library call (counter_app_events.h); EVS port 1
+ * prints them on the console. The OS_printf lines stay, so the counter timing can be checked on the console.
  *
- * File test (step 11a): once at start-up, before the 1 s schedule starts, the OSAL file API is exercised on
+ * File test: once at start-up, before the 1 s schedule starts, the OSAL file API is exercised on
  * cFE's RAM disk (/ram): directory, write, size, read back, append, listing, rename, remove; then the startup
  * script is read from /cf. Static buffers only (the Cortex-M3 task stack is 4 KiB).
+ *
+ * Library: NASA's sample_lib, loaded by cFE before this app (CFE_LIB line in the startup
+ * script); SAMPLE_LIB_Function is called once at start-up.
  */
 #include <string.h>
 
 #include "cfe.h"
 #include "counter_app_events.h"
+#include "sample_lib.h"
 
 #define COUNTER_APP_PERIOD_MS 1000
 
@@ -211,6 +215,25 @@ static int32 COUNTER_APP_FileTest(void)
     return 0;
 }
 
+/* Calls the library once; reports the result (event and console line). */
+static void COUNTER_APP_LibraryCall(void)
+{
+    int32 status = SAMPLE_LIB_Function();
+
+    if (status == CFE_SUCCESS)
+    {
+        CFE_EVS_SendEvent(COUNTER_APP_LIB_CALL_INF_EID, CFE_EVS_EventType_INFORMATION,
+                          "sample_lib call returned 0x%08lX", (unsigned long)status);
+        OS_printf("counter_app sample_lib call: PASS\n");
+    }
+    else
+    {
+        CFE_EVS_SendEvent(COUNTER_APP_LIB_CALL_ERR_EID, CFE_EVS_EventType_ERROR,
+                          "sample_lib call error, status 0x%08lX", (unsigned long)status);
+        OS_printf("counter_app sample_lib call: FAIL\n");
+    }
+}
+
 /* Sleeps until *deadline + one period, then advances *deadline. Resynchronises if local time jumps. */
 static void COUNTER_APP_WaitNextPeriod(OS_time_t *deadline)
 {
@@ -253,6 +276,7 @@ void COUNTER_APP_Main(void)
         CFE_EVS_SendEvent(COUNTER_APP_INIT_INF_EID, CFE_EVS_EventType_INFORMATION, "counter_app initialized");
         /* A failed step is reported (error event, "file test: FAIL" line); the counter runs on regardless. */
         (void)COUNTER_APP_FileTest();
+        COUNTER_APP_LibraryCall();
     }
 
     (void)OS_GetLocalTime(&deadline);

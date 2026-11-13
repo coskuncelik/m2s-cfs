@@ -15,6 +15,11 @@ EXPECTED_LINES=(
     "/COUNTER_APP 4: Read /cf/cfe_es_startup.scr: "
     "/COUNTER_APP 2: File test passed on /ram/counter: "
     "counter_app file test: PASS"
+    # sample_lib loaded by cFE and called by counter_app (step 11b, D38).
+    "SAMPLE Lib Initialized."
+    "SAMPLE_LIB_Function called, buffer='SAMPLE DATA'"
+    "/COUNTER_APP 5: sample_lib call returned 0x00000000"
+    "counter_app sample_lib call: PASS"
 )
 # None of these may appear in a run (extended regex, case-insensitive). "M2S ..." lines are the Cortex-M3
 # trap, assert, fault, panic and stop messages (boards/common-cm3/m2s_cm3_diag.h).
