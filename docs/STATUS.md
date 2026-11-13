@@ -1,6 +1,6 @@
 # Project status
 
-Last updated: 2026-11-12. Read this first when resuming. Rules: `CLAUDE.md`. Decisions: `docs/DECISIONS.md`.
+Last updated: 2026-11-13. Read this first when resuming. Rules: `CLAUDE.md`. Decisions: `docs/DECISIONS.md`.
 
 ## Steps
 
@@ -23,6 +23,8 @@ Last updated: 2026-11-12. Read this first when resuming. Rules: `CLAUDE.md`. Dec
 | **09c cFE functional tests on the emulated Cortex-M3, QEMU (D34)** | **closed 2026-11-07 (user approved)** | `docs/test-results/09c-cfe-functional-tests-arm-cm3-qemu.md` |
 | **07b bundle: simulator + QEMU Cortex-M3 configurations, history kept (D35)** | **closed 2026-11-09 (user approved); bundle published 2026-11-09: main = `ed41597`, tags `v1-sim`, `v2-sim-qemu`** | `docs/test-results/07b-export-bundle-qemu.md` |
 | **10 memory sizing of the Cortex-M3 flight image (D36)** | **closed 2026-11-12 (user approved; option A); 07-check-bundle failure left open (pre-existing export issue)** | `docs/test-results/10-memory-sizing.md` |
+| 11 counter_app features (11a–11d, simulator) | roadmap agreed 2026-11-13, not started | see "Roadmap: steps 11 and 12" |
+| 12 TC/TM over UDP with a Python ground station (12a–12c, simulator) | roadmap agreed 2026-11-13, not started | see "Roadmap: steps 11 and 12" |
 | SmartFusion2 target | not planned in detail yet (blocked by D7) | — |
 
 ## 04a: where it stands
@@ -200,6 +202,43 @@ accepts an unchanged bundle too. Verified: export recovers from a moved local ta
 tree unchanged; `07-check-bundle.sh` exit 0 (both configurations 5/5); published repository unchanged. The export
 now makes one local, untagged bundle commit (PORTING.md revision line only), not pushed. Details:
 `docs/test-results/07b-export-bundle-qemu.md`. Committed 2026-11-12 (user approved).
+
+## Roadmap: steps 11 and 12 (agreed with the user 2026-11-13, nothing implemented)
+
+Each sub-step still gets its own detailed plan (objective, files, risks, success criteria) and user approval
+before implementation. Next action: present the plan for 11a.
+
+User decisions: order 11a → 11b → 11c → 11d → 12a → 12b → 12c; **no floating point** (the user will raise it
+if needed); **no QEMU runs** in these steps (features tested on the Linux simulator; script 08 still checks the
+Cortex-M3 build and RAM budget, since the counter_app source stays common); network: UDP on the simulator only,
+the Cortex-M3 flight configuration keeps networking off; ground station: own minimal Python (standard library
+only, no install), not NASA's cFS-GroundSystem (PyQt5).
+
+- **11a events and file I/O:** EVS events for start-up, errors and test results (the `counter_app counter: N`
+  line stays: script 06 timing check); write, read back, compare, append, list and delete a file on `/ram`, read
+  `/cf`; OSAL file calls only, no C stdio.
+- **11b sample_lib:** link `sources/cFS/libs/sample_lib` statically, `CFE_LIB` line before the app in the startup
+  script, call its function from counter_app.
+- **11c commands, housekeeping, table, CDS:** command pipe (NOOP, RESET_COUNTERS, SET_PERIOD, standard command
+  codes and length checks); housekeeping telemetry on an HK request sent by `sch_lab` once per second; period from
+  a cFE table loaded from `/cf`; counter kept in the CDS across a processor reset. Commands themselves are tested
+  over UDP once step 12 exists.
+- **11d child task and timer:** worker task sharing data with the main task under an OSAL mutex, plus a binary
+  semaphore; an OSAL timer drives the period instead of `OS_TaskDelay`.
+- **12a OSAL sockets on the simulator:** first test whether a FreeRTOS POSIX-port task can block in a host
+  `select`/`recvfrom` (signals, EINTR, tick patch 0001); then enable OSAL networking for the simulator only,
+  reusing OSAL's portable BSD-socket code if blocking is safe, otherwise a non-blocking variant; socket code kept
+  separable so the board can use a different TCP/IP stack later; run OSAL's network tests.
+- **12b ci_lab + to_lab** in the simulator mission: commands in on UDP 1234, telemetry out on UDP 1235.
+- **12c ground station** `tools/ground_station/` (Python 3, stdlib `socket`/`struct`): CCSDS headers matching the
+  mission config (checked against cFE's headers and `cmdUtil`); sends the `to_lab` output enable, counter_app and
+  ES commands; decodes housekeeping and EVS events; logs to a file; an automated end-to-end test script.
+
+Facts checked 2026-11-12: OSAL network is off in both OSAL configs and the FreeRTOS OS layer has no socket code;
+ci_lab/to_lab use OSAL sockets (UDP); OSAL ships `os-impl-bsd-sockets.c`/`os-impl-bsd-select.c`. Later and
+separate: networking on the SmartFusion2 board (TCP/IP stack such as lwIP or FreeRTOS+TCP, MSS Ethernet driver
+blocked by D7); possibly QEMU's LAN9118 emulation as a middle step (not checked). Risk: Cortex-M3 RAM headroom
+is about 24 KB (500,396 of 524,288 bytes); each step re-measures with `scripts/10-memory-report.sh`.
 
 ## Known issues on the VirtualBox VM host (recorded 2026-11-06, user decision: keep as known, not investigated)
 
