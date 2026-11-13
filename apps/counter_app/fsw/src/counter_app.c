@@ -2,16 +2,18 @@
  * counter_app.c — m2s-cfs counter_app.
  *
  * A cFE application: registers with cFE, prints "counter_app initialized", then prints an incrementing
- * counter once per period (1 s by default) until cFE asks it to stop. Output goes through OS_printf
+ * counter once per period (1 s by default) until cFE asks it to stop.
+ *
+ * Tasks: an OSAL timer gives a binary semaphore every period; a child task ("worker") takes it, increments the
+ * counter under a mutex and prints it. The main task serves the command pipe (commands, housekeeping
+ * requests) and the parameter table; SET_PERIOD and a table update reprogram the timer. The counter and the
+ * period are shared by both tasks under the mutex. Output goes through OS_printf
  * (OSAL console -> BSP -> terminal or UART), so the same source runs on every target (D28).
  * Uses only the cFE and OSAL public APIs: no C library I/O, no platform code, no dynamic memory.
  *
- * Period: the loop waits until the next fixed deadline (OS_GetLocalTime) rather than a plain
- * OS_TaskDelay(period). OS_TaskDelay waits at least the time asked, up to one tick more, so plain delays
- * drift (about 1 ms per second measured on the simulator); deadlines keep the error within about a tick.
- * Until each deadline the command pipe is read with a timeout of the remaining time, so commands and
- * housekeeping requests are handled as they arrive (counter_app_cmds.c). The period comes from the parameter
- * table (default 1000 ms) and can be changed by command within the table's limits.
+ * Period: the OSAL timer's time base wakes at absolute tick deadlines, so the period does not drift (a
+ * plain OS_TaskDelay loop drifts by up to a tick per period). The period comes from the parameter table
+ * (default 1000 ms) and can be changed by command within the table's limits (counter_app_cmds.c).
  *
  * Events: EVS events for start-up, the file test and the library call (counter_app_events.h); EVS port 1
  * prints them on the console. The OS_printf lines stay, so the counter timing can be checked on the console.
@@ -238,64 +240,118 @@ static void COUNTER_APP_LibraryCall(void)
     }
 }
 
-/* Reads the command pipe until the deadline; returns when it has passed. */
-static void COUNTER_APP_ServiceUntil(OS_time_t deadline)
+/* Sets the period: shared value under the mutex, then the timer (if it exists yet). Main task only. */
+void COUNTER_APP_SetPeriod(uint32 PeriodMs)
 {
-    CFE_SB_Buffer_t *buf;
-    OS_time_t        now;
-    int64            remaining_ms;
-    CFE_Status_t     status;
+    int32 status;
 
-    for (;;)
+    (void)OS_MutSemTake(COUNTER_APP_Data.DataMutex);
+    COUNTER_APP_Data.PeriodMs = PeriodMs;
+    (void)OS_MutSemGive(COUNTER_APP_Data.DataMutex);
+
+    if (OS_ObjectIdDefined(COUNTER_APP_Data.TimerId))
     {
-        (void)OS_GetLocalTime(&now);
-        remaining_ms = OS_TimeGetTotalMilliseconds(OS_TimeSubtract(deadline, now));
-        if (remaining_ms <= 0)
+        status = OS_TimerSet(COUNTER_APP_Data.TimerId, PeriodMs * 1000U, PeriodMs * 1000U);
+        if (status != OS_SUCCESS)
         {
-            return;
-        }
-        status = CFE_SB_ReceiveBuffer(&buf, COUNTER_APP_Data.CommandPipe, (int32)remaining_ms);
-        if (status == CFE_SUCCESS)
-        {
-            COUNTER_APP_ProcessMessage(buf);
-        }
-        else if (status != CFE_SB_TIME_OUT)
-        {
-            CFE_EVS_SendEvent(COUNTER_APP_SB_ERR_EID, CFE_EVS_EventType_ERROR,
-                              "Software Bus receive error, status 0x%08lX", (unsigned long)(uint32)status);
-            (void)OS_TaskDelay((uint32)remaining_ms);
-            return;
+            CFE_EVS_SendEvent(COUNTER_APP_WORKER_ERR_EID, CFE_EVS_EventType_ERROR,
+                              "Timer set error, period %lu ms, status %ld", (unsigned long)PeriodMs, (long)status);
         }
     }
 }
 
-/* Waits until *deadline + one period (serving the pipe), then advances *deadline. Resynchronises if local
- * time jumps. */
-static void COUNTER_APP_WaitNextPeriod(OS_time_t *deadline)
+/* Timer callback (runs in the time base's helper task): only wakes the worker. */
+static void COUNTER_APP_TimerCallback(osal_id_t TimerId)
 {
-    OS_time_t now;
-    int64     remaining_ms;
-    uint32    period_ms = COUNTER_APP_Data.PeriodMs;
+    (void)TimerId;
+    (void)OS_BinSemGive(COUNTER_APP_Data.TickSem);
+}
 
-    *deadline = OS_TimeAdd(*deadline, OS_TimeFromTotalMilliseconds(period_ms));
-    (void)OS_GetLocalTime(&now);
-    remaining_ms = OS_TimeGetTotalMilliseconds(OS_TimeSubtract(*deadline, now));
+/* Worker task: one counter step per timer tick. */
+static void COUNTER_APP_Worker(void)
+{
+    uint32 counter;
+    int32  status;
 
-    if (remaining_ms < 0 || remaining_ms > (int64)period_ms)
+    for (;;)
     {
-        /* Late by more than a period, or local time was set: start a new schedule from now. */
-        *deadline = OS_TimeAdd(now, OS_TimeFromTotalMilliseconds(period_ms));
+        status = OS_BinSemTake(COUNTER_APP_Data.TickSem);
+        if (status != OS_SUCCESS)
+        {
+            CFE_EVS_SendEvent(COUNTER_APP_WORKER_ERR_EID, CFE_EVS_EventType_ERROR,
+                              "Worker semaphore take error, status %ld; worker stops", (long)status);
+            break;
+        }
+        (void)OS_MutSemTake(COUNTER_APP_Data.DataMutex);
+        counter = ++COUNTER_APP_Data.Counter;
+        (void)OS_MutSemGive(COUNTER_APP_Data.DataMutex);
+        OS_printf("counter_app counter: %lu\n", (unsigned long)counter);
     }
-    COUNTER_APP_ServiceUntil(*deadline);
+    CFE_ES_ExitChildTask();
+}
+
+/* Mutex and tick semaphore; needed before the table sets the period. */
+static int32 COUNTER_APP_CreateSync(void)
+{
+    int32 status = OS_MutSemCreate(&COUNTER_APP_Data.DataMutex, "COUNTER_DATA", 0);
+
+    if (status == OS_SUCCESS)
+    {
+        status = OS_BinSemCreate(&COUNTER_APP_Data.TickSem, "COUNTER_TICK", OS_SEM_EMPTY, 0);
+    }
+    if (status != OS_SUCCESS)
+    {
+        CFE_EVS_SendEvent(COUNTER_APP_WORKER_ERR_EID, CFE_EVS_EventType_ERROR,
+                          "Mutex or semaphore create error, status %ld", (long)status);
+    }
+    return status;
+}
+
+/* Worker task, then the timer that drives it at the current period. */
+static int32 COUNTER_APP_StartWorker(void)
+{
+    uint32 accuracy_us = 0;
+    uint32 period_ms;
+    int32  status;
+
+    status = CFE_ES_CreateChildTask(&COUNTER_APP_Data.WorkerId, COUNTER_APP_WORKER_NAME, COUNTER_APP_Worker,
+                                    CFE_ES_TASK_STACK_ALLOCATE, COUNTER_APP_WORKER_STACK,
+                                    COUNTER_APP_WORKER_PRIORITY, 0);
+    if (status != CFE_SUCCESS)
+    {
+        CFE_EVS_SendEvent(COUNTER_APP_WORKER_ERR_EID, CFE_EVS_EventType_ERROR,
+                          "Worker task create error, status 0x%08lX", (unsigned long)(uint32)status);
+        return status;
+    }
+
+    status = OS_TimerCreate(&COUNTER_APP_Data.TimerId, "COUNTER_TIMER", &accuracy_us, COUNTER_APP_TimerCallback);
+    if (status == OS_SUCCESS)
+    {
+        (void)OS_MutSemTake(COUNTER_APP_Data.DataMutex);
+        period_ms = COUNTER_APP_Data.PeriodMs;
+        (void)OS_MutSemGive(COUNTER_APP_Data.DataMutex);
+        status = OS_TimerSet(COUNTER_APP_Data.TimerId, period_ms * 1000U, period_ms * 1000U);
+    }
+    if (status != OS_SUCCESS)
+    {
+        CFE_EVS_SendEvent(COUNTER_APP_WORKER_ERR_EID, CFE_EVS_EventType_ERROR,
+                          "Timer create or set error, status %ld", (long)status);
+        return status;
+    }
+    CFE_EVS_SendEvent(COUNTER_APP_WORKER_INF_EID, CFE_EVS_EventType_INFORMATION,
+                      "Worker task and timer started: period %lu ms, timer accuracy %lu us", (unsigned long)period_ms,
+                      (unsigned long)accuracy_us);
+    return OS_SUCCESS;
 }
 
 void COUNTER_APP_Main(void)
 {
-    CFE_Status_t status;
-    OS_time_t    deadline;
+    CFE_SB_Buffer_t *buf;
+    CFE_Status_t     status;
 
     memset(&COUNTER_APP_Data, 0, sizeof(COUNTER_APP_Data));
     COUNTER_APP_Data.RunStatus = CFE_ES_RunStatus_APP_RUN;
+    COUNTER_APP_Data.TimerId   = OS_OBJECT_ID_UNDEFINED;
 
     /* Register with Event Services (no event filters). */
     status = CFE_EVS_Register(NULL, 0, CFE_EVS_EventFilter_BINARY);
@@ -308,25 +364,40 @@ void COUNTER_APP_Main(void)
     {
         OS_printf("counter_app initialized\n");
         CFE_EVS_SendEvent(COUNTER_APP_INIT_INF_EID, CFE_EVS_EventType_INFORMATION, "counter_app initialized");
-        /* Pipe, subscriptions and parameter table are needed for the loop: their failure stops the app. */
-        if (COUNTER_APP_InitBusAndTable() != CFE_SUCCESS)
+        /* Mutex, semaphore, pipe, table, worker and timer are needed for the counter: a failure stops the app. */
+        if (COUNTER_APP_CreateSync() != OS_SUCCESS || COUNTER_APP_InitBusAndTable() != CFE_SUCCESS)
         {
             COUNTER_APP_Data.RunStatus = CFE_ES_RunStatus_APP_ERROR;
         }
         /* A failed step is reported (error event, "file test: FAIL" line); the counter runs on regardless. */
         COUNTER_APP_Data.FileTestFailedStep = (uint8)COUNTER_APP_FileTest();
         COUNTER_APP_LibraryCall();
+        if (COUNTER_APP_Data.RunStatus == CFE_ES_RunStatus_APP_RUN && COUNTER_APP_StartWorker() != OS_SUCCESS)
+        {
+            COUNTER_APP_Data.RunStatus = CFE_ES_RunStatus_APP_ERROR;
+        }
     }
 
-    (void)OS_GetLocalTime(&deadline);
-
+    /* Main task: commands and housekeeping requests as they arrive; table actions at least once a second. */
     while (CFE_ES_RunLoop(&COUNTER_APP_Data.RunStatus))
     {
-        COUNTER_APP_WaitNextPeriod(&deadline);
+        status = CFE_SB_ReceiveBuffer(&buf, COUNTER_APP_Data.CommandPipe, 1000);
+        if (status == CFE_SUCCESS)
+        {
+            COUNTER_APP_ProcessMessage(buf);
+        }
+        else if (status != CFE_SB_TIME_OUT)
+        {
+            CFE_EVS_SendEvent(COUNTER_APP_SB_ERR_EID, CFE_EVS_EventType_ERROR,
+                              "Software Bus receive error, status 0x%08lX", (unsigned long)(uint32)status);
+            (void)OS_TaskDelay(1000);
+        }
         COUNTER_APP_ManageTable();
-        ++COUNTER_APP_Data.Counter;
-        OS_printf("counter_app counter: %lu\n", (unsigned long)COUNTER_APP_Data.Counter);
     }
 
+    if (OS_ObjectIdDefined(COUNTER_APP_Data.TimerId))
+    {
+        (void)OS_TimerDelete(COUNTER_APP_Data.TimerId);
+    }
     CFE_ES_ExitApp(COUNTER_APP_Data.RunStatus);
 }

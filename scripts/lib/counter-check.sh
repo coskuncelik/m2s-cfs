@@ -22,6 +22,8 @@ EXPECTED_LINES=(
     "counter_app sample_lib call: PASS"
     # Parameter table loaded from memory at start-up (step 11c, D39).
     "/COUNTER_APP 8: Table loaded: period 1000 ms, limits 500..5000 ms"
+    # Worker task and timer drive the counter (step 11d, D40).
+    "/COUNTER_APP 18: Worker task and timer started: period 1000 ms"
 )
 # Expected only in the project's own missions (scripts 06 and 09), which run sch_lab; the exported bundle has no
 # sch_lab yet (its /cf image cannot hold build-time table files, D39). The caller sets COUNTER_CHECK_BUNDLE=1

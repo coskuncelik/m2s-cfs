@@ -23,7 +23,7 @@ Last updated: 2026-11-13. Read this first when resuming. Rules: `CLAUDE.md`. Dec
 | **09c cFE functional tests on the emulated Cortex-M3, QEMU (D34)** | **closed 2026-11-07 (user approved)** | `docs/test-results/09c-cfe-functional-tests-arm-cm3-qemu.md` |
 | **07b bundle: simulator + QEMU Cortex-M3 configurations, history kept (D35)** | **closed 2026-11-09 (user approved); bundle published 2026-11-09: main = `ed41597`, tags `v1-sim`, `v2-sim-qemu`** | `docs/test-results/07b-export-bundle-qemu.md` |
 | **10 memory sizing of the Cortex-M3 flight image (D36)** | **closed 2026-11-12 (user approved; option A); 07-check-bundle failure left open (pre-existing export issue)** | `docs/test-results/10-memory-sizing.md` |
-| 11 counter_app features (11a–11d, simulator) | **11a closed (D37); 11b closed (D38); 11c commands/HK/table closed 2026-11-13 (D39, user approved); 11d not started** | `docs/test-results/11a-counter-app-events-files.md`; roadmap below |
+| 11 counter_app features (11a–11d, simulator) | **closed 2026-11-13 (user approved): 11a (D37), 11b (D38), 11c (D39), 11d (D40)** | `docs/test-results/11a-counter-app-events-files.md`; roadmap below |
 | 12 TC/TM over UDP with a Python ground station (12a–12c, simulator) | roadmap agreed 2026-11-13, not started | see "Roadmap: steps 11 and 12" |
 | SmartFusion2 target | not planned in detail yet (blocked by D7) | — |
 
@@ -212,8 +212,10 @@ closed and committed (user approved). 11b done 2026-11-13 (D38): 06 5/5, missing
 second: one QEMU run started late on the host); closed and committed (user approved). Next action: the
 plan for 11c. 11c done 2026-11-13 (D39; CDS left as future work, sch_lab only in the project missions):
 06 5/5, invalid table rejected, 08 RAM 504,748 bytes (96 %), 09 5/5, 10 (stacks ≥ 34 % free), 07-check-bundle
-exit 0 on the rerun (first run: one QEMU late/early pair); closed and committed (user approved). Next action:
-the plan for 11d.
+exit 0 on the rerun (first run: one QEMU late/early pair); closed and committed (user approved). 11d done
+2026-11-13 (D40): 06 5/5, a 2000 ms table period rejected by the 1 s check (period comes from the timer), 08 RAM
+504,764 bytes (96 %), 09 5/5, 10 (worker 83 % stack free), 07-check-bundle exit 0; closed and committed (user
+approved). Next action: the plan for 12a.
 
 Future work (user decisions 2026-11-13): (1) counter_app CDS kept across a processor reset — needs PSP
 processor-reset support (simulator: file-backed reserved memory and re-exec; board: no-init RAM) and a restart

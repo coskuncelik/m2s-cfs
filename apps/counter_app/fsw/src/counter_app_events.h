@@ -21,5 +21,7 @@
 #define COUNTER_APP_LEN_ERR_EID       15 /* error: command length does not match its code */
 #define COUNTER_APP_MID_ERR_EID       16 /* error: message ID not handled by this app */
 #define COUNTER_APP_SB_ERR_EID        17 /* error: Software Bus pipe or subscription */
+#define COUNTER_APP_WORKER_INF_EID    18 /* information: worker task and timer started */
+#define COUNTER_APP_WORKER_ERR_EID    19 /* error: worker task, timer, semaphore or mutex */
 
 #endif /* COUNTER_APP_EVENTS_H */

@@ -38,15 +38,15 @@ static CFE_Status_t COUNTER_APP_ReadParams(const char *what)
     if (status == CFE_SUCCESS || status == CFE_TBL_INFO_UPDATED)
     {
         const COUNTER_APP_ParamTable_t *t = addr;
+        uint32                          period = t->DefaultPeriodMs;
 
-        COUNTER_APP_Data.PeriodMs    = t->DefaultPeriodMs;
         COUNTER_APP_Data.MinPeriodMs = t->MinPeriodMs;
         COUNTER_APP_Data.MaxPeriodMs = t->MaxPeriodMs;
         (void)CFE_TBL_ReleaseAddress(COUNTER_APP_Data.TblHandle);
+        COUNTER_APP_SetPeriod(period);
         CFE_EVS_SendEvent(COUNTER_APP_TBL_INF_EID, CFE_EVS_EventType_INFORMATION,
-                          "Table %s: period %lu ms, limits %lu..%lu ms", what,
-                          (unsigned long)COUNTER_APP_Data.PeriodMs, (unsigned long)COUNTER_APP_Data.MinPeriodMs,
-                          (unsigned long)COUNTER_APP_Data.MaxPeriodMs);
+                          "Table %s: period %lu ms, limits %lu..%lu ms", what, (unsigned long)period,
+                          (unsigned long)COUNTER_APP_Data.MinPeriodMs, (unsigned long)COUNTER_APP_Data.MaxPeriodMs);
         status = CFE_SUCCESS;
     }
     return status;
@@ -106,8 +106,10 @@ static void COUNTER_APP_SendHk(void)
 {
     COUNTER_APP_HkTlm_Payload_t *p = &COUNTER_APP_Data.HkTlm.Payload;
 
-    p->Counter             = COUNTER_APP_Data.Counter;
-    p->PeriodMs            = COUNTER_APP_Data.PeriodMs;
+    (void)OS_MutSemTake(COUNTER_APP_Data.DataMutex);
+    p->Counter  = COUNTER_APP_Data.Counter;
+    p->PeriodMs = COUNTER_APP_Data.PeriodMs;
+    (void)OS_MutSemGive(COUNTER_APP_Data.DataMutex);
     p->LibCallStatus       = COUNTER_APP_Data.LibCallStatus;
     p->CommandCounter      = COUNTER_APP_Data.CommandCounter;
     p->CommandErrorCounter = COUNTER_APP_Data.CommandErrorCounter;
@@ -183,7 +185,7 @@ static void COUNTER_APP_ProcessCommand(const CFE_SB_Buffer_t *SBBufPtr)
                 else
                 {
                     ++COUNTER_APP_Data.CommandCounter;
-                    COUNTER_APP_Data.PeriodMs = ms;
+                    COUNTER_APP_SetPeriod(ms);
                     CFE_EVS_SendEvent(COUNTER_APP_PERIOD_INF_EID, CFE_EVS_EventType_INFORMATION,
                                       "Period set to %lu ms", (unsigned long)ms);
                 }
