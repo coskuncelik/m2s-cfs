@@ -23,3 +23,6 @@ add_compile_options(
 # linker may take that fallback, and cFE never starts.
 set(CMAKE_C_LINK_EXECUTABLE
     "<CMAKE_C_COMPILER> <FLAGS> <CMAKE_C_LINK_FLAGS> <LINK_FLAGS> -Wl,-u,CFE_PSP_Main <OBJECTS> -o <TARGET> -Wl,--start-group <LINK_LIBRARIES> -Wl,--end-group")
+
+# counter_app's public headers (message IDs) for the sch_lab and to_lab tables in tables/ of this folder.
+include_directories("${MISSION_SOURCE_DIR}/apps/counter_app/fsw/inc")

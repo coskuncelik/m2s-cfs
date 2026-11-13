@@ -40,14 +40,15 @@ BUNDLE_URL="${BUNDLE_URL:-https://github.com/coskuncelik/cfs-m2s-freertos.git}"
 BASE_COMMIT="d48850f"
 BASE_TAG="v1-sim"
 # This export's version: tag and team-facing commit message (no private references; checked below).
-BUNDLE_TAG="${BUNDLE_TAG:-v2-sim-qemu}"
-BUNDLE_TITLE="${BUNDLE_TITLE:-Add the QEMU Cortex-M3 configuration; mission configs freertos_sim and freertos_qemu}"
-BUNDLE_BODY="${BUNDLE_BODY:-Two mission configurations, selected with MISSIONCONFIG: freertos_sim_defs (Linux simulator, the
-previous sample_defs, unchanged in content) and freertos_qemu_defs (ARM Cortex-M3 on QEMU mps2-an385, built
-with arm-none-eabi-gcc and newlib-nano, no heap: every allocation call traps). New: OSAL BSP and cFE PSP
-freertos-arm-cm3, the generic Cortex-M3 start-up and the QEMU board under osal/src/bsp/freertos-arm-cm3/boards.
-sample_defs is renamed: build with "make MISSIONCONFIG=freertos_sim O=build-sim prep" (see README.md), and
-delete an old build/ folder first. Versions and the list of added and changed files: PORTING.md.}"
+BUNDLE_TAG="${BUNDLE_TAG:-v3-tctm-sim}"
+BUNDLE_TITLE="${BUNDLE_TITLE:-Commands and telemetry over UDP on the simulator; counter_app features; ground station}"
+BUNDLE_BODY="${BUNDLE_BODY:-Simulator (freertos_sim): OSAL networking with host sockets (every socket wait polls, so a waiting task
+does not stop lower-priority FreeRTOS tasks); NASA sch_lab, ci_lab (commands in, UDP 1234) and to_lab
+(telemetry out, UDP 1235); a Python ground station in ground_station/ (standard library only). counter_app
+(both configurations): events, a start-up file test on /ram, a call to sample_lib, commands NOOP/RESET_COUNTERS/
+SET_PERIOD with housekeeping telemetry, a parameter table, and a worker task driven by an OSAL timer. The /cf
+image is now also built at build time with the table images, so one make embeds them. Delete old build folders
+and run prep again. Details: README.md, PORTING.md, ground_station/README.md.}"
 CFS_DIR="${ROOT_DIR}/sources/cFS"
 KERNEL_DIR="${ROOT_DIR}/sources/FreeRTOS-Kernel"
 EXPORT_SRC="${ROOT_DIR}/export"
@@ -69,7 +70,7 @@ CONFIGS=(freertos_sim freertos_qemu)
 # Added directories in the bundle (relative to OUT_DIR), for PORTING.md and the checks.
 ADDED_DIRS=(osal/src/os/freertos osal/src/bsp/freertos-posix-sim psp/fsw/freertos-posix-sim
             psp/fsw/modules/timebase_freertos apps/counter_app
-            osal/src/bsp/freertos-arm-cm3 psp/fsw/freertos-arm-cm3)
+            osal/src/bsp/freertos-arm-cm3 psp/fsw/freertos-arm-cm3 ground_station)
 
 # Private references that must not appear in any added or generated file (extended regex).
 LEAK_PATTERN='\bD[0-9]{1,2}\b|DECISIONS|STATUS\.md|prompt\.md|CLAUDE|[Ss]teps? 0[0-9]|\b0[0-9][abc]\b|m2s-cfs|scripts/|osal-ext|psp-ext|OSAL_EXT_SOURCE_DIR|sources/|config/(cfe|osal|freertos)/|patches/freertos-kernel|docs/|tests/|test-results|/workspaces|codespace'
@@ -131,6 +132,10 @@ add_port() {
     copy_project psp-ext/fsw/freertos-posix-sim psp/fsw/freertos-posix-sim
     copy_project psp-ext/fsw/modules/timebase_freertos psp/fsw/modules/timebase_freertos
     copy_project apps/counter_app apps/counter_app
+    # Ground station (Python, host side): the program as is, the bundle's own README (bundle paths).
+    mkdir -p "${OUT_DIR}/ground_station"
+    cp "${ROOT_DIR}/tools/ground_station/ground_station.py" "${OUT_DIR}/ground_station/"
+    cp "${EXPORT_SRC}/ground_station_README.md" "${OUT_DIR}/ground_station/README.md"
 
     # Cortex-M3: OSAL BSP with the kernel helper, compiler settings, FreeRTOS config and the board folders
     # (generic Cortex-M3 code and the QEMU board; the placeholder link-check board is not shipped).
@@ -148,7 +153,7 @@ add_port() {
     local c
     for c in "${CONFIGS[@]}"; do
         cp -a "${OUT_DIR}/cfe/cmake/sample_defs" "${OUT_DIR}/${c}_defs"
-        cp "${EXPORT_SRC}/${c}_defs"/* "${OUT_DIR}/${c}_defs/"
+        cp -a "${EXPORT_SRC}/${c}_defs"/. "${OUT_DIR}/${c}_defs/"   # files and sub-folders (tables/)
         cat "${EXPORT_SRC}/mission_build_custom.append.cmake" >>"${OUT_DIR}/${c}_defs/mission_build_custom.cmake"
         # cFE needs <MISSIONCONFIG>_perfids.h (no default): the stock sample_perfids.h under this config's name.
         cp "${OUT_DIR}/cfe/cmake/sample_defs/sample_perfids.h" "${OUT_DIR}/${c}_defs/${c}_perfids.h"
@@ -360,12 +365,12 @@ check_leaks() {
     hits="$(cd "${OUT_DIR}" && grep -rnE -- "${LEAK_PATTERN}" "${ADDED_DIRS[@]}" Makefile README.md PORTING.md NOTICE .gitignore || true)"
     # *_defs: only the files this bundle adds or replaces are checked (the stock ones are upstream).
     for c in "${CONFIGS[@]}"; do
-        for f in "${OUT_DIR}/${c}_defs"/*; do
-            [[ -f "${f}" ]] || continue
-            if [[ ! -e "${OUT_DIR}/cfe/cmake/sample_defs/${f##*/}" ]] || ! cmp -s "${f}" "${OUT_DIR}/cfe/cmake/sample_defs/${f##*/}"; then
-                hits+="$(grep -nE -- "${LEAK_PATTERN}" "${f}" | sed "s|^|${c}_defs/${f##*/}:|" || true)"
+        while IFS= read -r -d '' f; do
+            f="${f#"${OUT_DIR}/${c}_defs/"}"
+            if [[ ! -e "${OUT_DIR}/cfe/cmake/sample_defs/${f}" ]] || ! cmp -s "${OUT_DIR}/${c}_defs/${f}" "${OUT_DIR}/cfe/cmake/sample_defs/${f}"; then
+                hits+="$(grep -nE -- "${LEAK_PATTERN}" "${OUT_DIR}/${c}_defs/${f}" | sed "s|^|${c}_defs/${f}:|" || true)"
             fi
-        done
+        done < <(find "${OUT_DIR}/${c}_defs" -type f -print0)
     done
     if [[ -n "${hits}" ]]; then
         printf '%s\n' "${hits}" | sed 's/^/        /'

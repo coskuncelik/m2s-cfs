@@ -1,5 +1,8 @@
 CFE_LIB, sample_lib,  SAMPLE_LIB_Init,  SAMPLE_LIB,  0,  0,     0x0, 0;
 CFE_APP, counter_app, COUNTER_APP_Main, COUNTER_APP, 50, 16384, 0x0, 0;
+CFE_APP, ci_lab,      CI_LAB_AppMain,   CI_LAB_APP,  60, 16384, 0x0, 0;
+CFE_APP, to_lab,      TO_LAB_AppMain,   TO_LAB_APP,  70, 16384, 0x0, 0;
+CFE_APP, sch_lab,     SCH_LAB_AppMain,  SCH_LAB_APP, 80, 16384, 0x0, 0;
 !
 ! cfs-m2s-freertos cFE startup script for cpu1.
 ! Packed into the embedded /cf image (cf.tar, see mission_build_custom.cmake) and unpacked to

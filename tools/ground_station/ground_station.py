@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ground_station.py — minimal ground station for the m2s-cfs Linux simulator (step 12c, D43).
+"""ground_station.py — minimal ground station for cFS on the FreeRTOS Linux simulator.
 
 Talks to cFS over UDP: commands go to ci_lab (default 127.0.0.1:1234), telemetry comes from to_lab (default
 UDP port 1235, after the "tlm-enable" command). Python 3 standard library only.
@@ -13,7 +13,7 @@ Usage:
   ground_station.py interactive [--log FILE]               listen and type commands at the same time
 Common options: --host (command destination), --cmd-port, --tlm-port.
 
-Formats (must match the flight software; the automated test scripts/12c-run-ground-station-sim.sh checks them):
+Formats (must match the flight software; written out here, checked by an end-to-end test):
   command:   CCSDS primary header (6 bytes, big-endian: stream id = MID, sequence 0xC000, length = total - 7)
              + cFS command secondary header (function code, checksum) + payload (little-endian on the
              simulator). Checksum: 0xFF XOR all packet bytes, computed with the checksum byte at 0
@@ -134,7 +134,7 @@ def emit(line, log):
 # ---- main ---------------------------------------------------------------------------------------------------
 
 def main():
-    ap = argparse.ArgumentParser(description="m2s-cfs ground station (simulator)")
+    ap = argparse.ArgumentParser(description="cFS ground station (FreeRTOS Linux simulator)")
     ap.add_argument("--host", default="127.0.0.1", help="command destination (ci_lab)")
     ap.add_argument("--cmd-port", type=int, default=1234)
     ap.add_argument("--tlm-port", type=int, default=1235)

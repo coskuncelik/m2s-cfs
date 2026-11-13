@@ -25,8 +25,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/cfe-sim.sh"
 # shellcheck source=lib/counter-check.sh
 source "${SCRIPT_DIR}/lib/counter-check.sh"
-# The bundle has no sch_lab yet (D39): its sch_lab and housekeeping lines are not expected.
-COUNTER_CHECK_BUNDLE=1
 cfe_sim_init freertos-posix-sim
 LOG_FILE="${LOG_DIR}/07-check-bundle.log"
 RUN_DIR="${LOG_DIR}/07-bundle-runs"
@@ -42,7 +40,7 @@ CLONE="${ROOT_DIR}/build/export/clone/cfs-m2s-freertos"
 # Upstream paths that differ on purpose (cFS root): replaced, renamed or left out.
 CHANGED_UPSTREAM='^(\.gitignore|README\.md|\.gitmodules|\.github/.*)$'
 # Files the bundle adds besides the port directories (each *_defs is a copy of cfe/cmake/sample_defs).
-GENERATED='^(Makefile|README\.md|README-cFS\.md|PORTING\.md|NOTICE|\.gitignore|freertos_sim_defs/.*|freertos_qemu_defs/.*|osal/src/os/freertos/.*|osal/src/bsp/freertos-posix-sim/.*|osal/src/bsp/freertos-arm-cm3/.*|psp/fsw/freertos-posix-sim/.*|psp/fsw/freertos-arm-cm3/.*|psp/fsw/modules/timebase_freertos/.*|apps/counter_app/.*)$'
+GENERATED='^(Makefile|README\.md|README-cFS\.md|PORTING\.md|NOTICE|\.gitignore|freertos_sim_defs/.*|freertos_qemu_defs/.*|osal/src/os/freertos/.*|osal/src/bsp/freertos-posix-sim/.*|osal/src/bsp/freertos-arm-cm3/.*|psp/fsw/freertos-posix-sim/.*|psp/fsw/freertos-arm-cm3/.*|psp/fsw/modules/timebase_freertos/.*|apps/counter_app/.*|ground_station/.*)$'
 
 check_cross_tools_and_qemu() {
     local tool
@@ -108,7 +106,7 @@ check_no_leaks() {
     done
     hits="$(cd "${BUNDLE}" && git grep -nE "${re}" \
             -- osal/src/os/freertos osal/src/bsp/freertos-posix-sim osal/src/bsp/freertos-arm-cm3 psp/fsw/freertos-posix-sim \
-               psp/fsw/freertos-arm-cm3 psp/fsw/modules/timebase_freertos apps/counter_app README.md PORTING.md NOTICE \
+               psp/fsw/freertos-arm-cm3 psp/fsw/modules/timebase_freertos apps/counter_app ground_station README.md PORTING.md NOTICE \
                .gitignore Makefile "${defs[@]}" || true)"
     [[ -z "${hits}" ]] || { printf '%s\n' "${hits}"; die "private references in the committed bundle"; }
     if grep -nE "${re}" <<<"$(git -C "${BUNDLE}" log -1 --format=%B)"; then die "private references in the bundle commit message"; fi
@@ -146,9 +144,59 @@ check_sim() {
     RUN_DIR="${LOG_DIR}/07-bundle-runs"
     RUN_CMD="./core-cpu1"
     RUN_WARMUP_SECONDS=0
+    # sch_lab runs in this configuration: its lines and counter_app's housekeeping line are expected (D44).
+    COUNTER_CHECK_BUNDLE=0
     log "--- freertos_sim (Linux simulator)"
     cfe_sim_check_static_only
+    check_cf_image "${CLONE}/freertos_sim_defs/cf.tar" cfe_es_startup.scr sch_lab_table.tbl to_lab_sub.tbl
     run_counter_app
+    check_tctm
+}
+
+# The /cf image built by a single "make" in the clone holds exactly the given files (D44).
+check_cf_image() {
+    local tar="$1" want got
+    shift
+    [[ -f "${tar}" ]] || die "no /cf image ${tar}"
+    want="$(printf '%s\n' "$@" | LC_ALL=C sort)"
+    got="$(tar -tf "${tar}" | sed -n 's|^\./||p' | grep -v '^$' | grep -v '/$' | LC_ALL=C sort)"
+    [[ "${got}" == "${want}" ]] || die "/cf image ${tar##*/}: has [$(echo ${got})], expected [$(echo ${want})]"
+    log "OK   /cf image after one make: $(echo ${got})"
+}
+
+# Commands and telemetry over UDP in the clone, with the bundle's own ground station (D44): tlm-enable, noop,
+# es-noop; counter_app housekeeping with the command counter 1, the NOOP event and ES's NOOP event.
+check_tctm() {
+    local dir="${LOG_DIR}/07-bundle-tctm" gs="${CLONE}/ground_station/ground_station.py" sim gsl t
+    rm -rf "${dir}"
+    mkdir -p "${dir}"
+    for t in 1234 1235; do
+        python3 -I -c 'import socket,sys; s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM); s.bind(("127.0.0.1",int(sys.argv[1])))' "${t}" 2>/dev/null \
+            || die "UDP port ${t} is in use"
+    done
+    python3 -I "${gs}" listen --seconds 20 --log "${dir}/telemetry.log" >/dev/null 2>&1 &
+    gsl=$!
+    (cd "${CLONE}/build-sim/exe/cpu1" && exec ./core-cpu1 </dev/null >"${dir}/console.log" 2>&1) &
+    sim=$!
+    for t in $(seq 1 150); do
+        grep -qF "CI_LAB listening on UDP port" "${dir}/console.log" 2>/dev/null && break
+        sleep 0.1
+    done
+    sleep 1
+    python3 -I "${gs}" send tlm-enable
+    sleep 2
+    python3 -I "${gs}" send noop
+    sleep 2
+    python3 -I "${gs}" send es-noop
+    sleep 2
+    kill -INT "${sim}" 2>/dev/null || true
+    wait "${sim}" 2>/dev/null || true
+    kill -TERM "${gsl}" 2>/dev/null || true   # background jobs ignore SIGINT in a non-interactive shell
+    wait "${gsl}" 2>/dev/null || true
+    grep -q "COUNTER_HK .* cmdcnt=1 errcnt=0" "${dir}/telemetry.log" || die "TC/TM: no counter_app housekeeping with command counter 1 (see ${dir})"
+    grep -q "EVENT COUNTER_APP 10 INFO: NOOP command received" "${dir}/telemetry.log" || die "TC/TM: no NOOP event in the telemetry"
+    grep -q "EVENT CFE_ES 3 INFO: No-op command" "${dir}/telemetry.log" || die "TC/TM: no ES NOOP event in the telemetry"
+    log "OK   TC/TM with the bundle's ground station: housekeeping (command counter 1), NOOP event, ES NOOP event"
 }
 
 check_qemu() {
@@ -166,7 +214,10 @@ check_qemu() {
     # The first QEMU launch right after the two builds took about 5 s to print anything (cold start), which
     # left only 14 of the 20 s for counting; one untimed warm-up launch first (limits unchanged).
     RUN_WARMUP_SECONDS=3
+    # No sch_lab in this configuration: its lines are not expected.
+    COUNTER_CHECK_BUNDLE=1
     log "--- freertos_qemu (Cortex-M3 on QEMU mps2-an385)"
+    check_cf_image "${CLONE}/freertos_qemu_defs/cf.tar" cfe_es_startup.scr
     check_image
     check_got
     check_map

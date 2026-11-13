@@ -82,7 +82,8 @@ The Cortex-M3 target (configuration `freertos_qemu`) keeps the top layers and re
 | Clock | `os-impl-clock.c` | Local time = the time set + ticks since then (the 32-bit tick extended to 64 bits). The tick is 1 kHz. |
 | Console | `os-impl-console.c` | `OS_printf` → OSAL ring buffer → static console task → BSP output. |
 | Files | `os-ramfs.c`, `os-impl-filesys.c` | Static RAM file system. A volume is one memory area: entries, a block table and fixed-size blocks. `OS_mkfs` uses the caller's memory, or a static pool (`OS_FREERTOS_RAMFS_POOL_BYTES`, 1 MiB). Fixed maps such as `/cf` are directories of a built-in root volume (`OS_FREERTOS_RAMFS_ROOT_BYTES`). |
-| Not supported | OSAL `portable/os-impl-no-*.c` | Condition variables, shell, loader, symbol table, network, sockets, select. |
+| Sockets (simulator only) | `os-impl-host-sockets.c` + OSAL `portable/os-impl-bsd-sockets.c`, `os-impl-posix-network.c` | Built when OSAL networking is on and the BSP is `freertos-posix-sim`. Host sockets, non-blocking; every wait polls with a zero-timeout `select()` and blocks the task for one tick between polls (a FreeRTOS POSIX-port task in a blocking host call starves lower-priority tasks). Socket streams share the stream table with RAM files and are dispatched in `OS_Generic*_Impl`. Other BSPs keep the stubs below; networking on with another BSP stops the build. |
+| Not supported | OSAL `portable/os-impl-no-*.c` | Condition variables, shell, loader, symbol table; network, sockets and select on the Cortex-M3. |
 
 All FreeRTOS objects are created with the `*Static` APIs from memory defined in this layer.
 
@@ -114,10 +115,19 @@ A new board is a new folder next to `qemu-mps2-an385` with the same three files 
 
 ## Mission configurations (`freertos_sim_defs`, `freertos_qemu_defs`)
 
-- **Apps are linked statically.** `cpu1_STATIC_APPLIST counter_app`, and `cpu1_STATIC_SYMLIST` fills
-  OSAL's static symbol table. ES loads the app by its cFE name from the startup script.
-- **The `/cf` image.** `mission_build_custom.cmake` packs `cpu1_cfe_es_startup.scr` into `cf.tar` at
-  configure time, and `cpu1_EMBED_FILELIST` embeds it in `core-cpu1`.
+- **Apps are linked statically.** `cpu1_STATIC_APPLIST` (`sample_lib counter_app`; on the simulator also
+  `sch_lab ci_lab to_lab`), and `cpu1_STATIC_SYMLIST` fills OSAL's static symbol table. ES loads each app or
+  library by its cFE name from the startup script.
+- **The `/cf` image.** `mission_build_custom.cmake` packs `cpu1_cfe_es_startup.scr` into `cf.tar` at configure
+  time (cFE's embed rule needs the file), and again at build time together with every table image the build
+  made for cpu1 (target `m2s-cf-image`, after cFE's table tool and before `core-cpu1` is built), so a single
+  `make` puts the default tables of `sch_lab` and `to_lab` into `/cf`. `cpu1_EMBED_FILELIST` embeds `cf.tar` in
+  `core-cpu1`; an unchanged archive is byte-identical and causes no relink.
+- **Table sources.** cFE uses `<config>_defs/tables/<table>.c` in place of an app's default table source:
+  the simulator configuration replaces `sch_lab`'s schedule (counter_app, ci_lab and to_lab housekeeping
+  requests, ci_lab's READ_UPLINK at 10 Hz) and `to_lab`'s subscriptions (counter_app housekeeping, ci_lab/to_lab
+  housekeeping, events). `arch_build_custom.cmake` puts counter_app's public headers on their include path.
+- **Networking** is on only in the simulator configuration (`freertos-posix-sim_osconfig.cmake`).
 - **Linking** (`arch_build_custom.cmake`):
   - libraries are linked in a GNU ld group, because the core modules are only linked `--whole-archive`
     when a CPU has dynamic apps;
@@ -133,9 +143,14 @@ A new board is a new folder next to `qemu-mps2-an385` with the same three files 
 The port was tested on both targets before export. On the simulator:
 
 - the OSAL functional and unit test programs (except the assertions for features this layer leaves out:
-  network and loading modules from files);
+  loading modules from files);
 - cFE start-up;
-- `counter_app` timing (1 s ± 50 ms per interval, under 10 ms drift over 20 s);
+- `counter_app` timing (1 s ± 50 ms per interval, under 10 ms drift over 20 s), its start-up file test, library
+  call and table load;
+- OSAL's network and select tests with host sockets;
+- commands and telemetry over UDP: every counter_app command and its error cases (wrong length, unknown code,
+  period outside the table's limits) through `ci_lab`, with the effects checked in the housekeeping and event
+  telemetry from `to_lab`; the ground station's command bytes equal cFE's `cmdUtil` for the same commands;
 - cFE's own functional tests (`cfe_testcase` with `cfe_assert`), with all 2521 assertions compared one by one
   against stock cFE on native Linux.
 
