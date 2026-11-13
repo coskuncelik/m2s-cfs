@@ -24,7 +24,7 @@ Last updated: 2026-11-13. Read this first when resuming. Rules: `CLAUDE.md`. Dec
 | **07b bundle: simulator + QEMU Cortex-M3 configurations, history kept (D35)** | **closed 2026-11-09 (user approved); bundle published 2026-11-09: main = `ed41597`, tags `v1-sim`, `v2-sim-qemu`** | `docs/test-results/07b-export-bundle-qemu.md` |
 | **10 memory sizing of the Cortex-M3 flight image (D36)** | **closed 2026-11-12 (user approved; option A); 07-check-bundle failure left open (pre-existing export issue)** | `docs/test-results/10-memory-sizing.md` |
 | 11 counter_app features (11a–11d, simulator) | **closed 2026-11-13 (user approved): 11a (D37), 11b (D38), 11c (D39), 11d (D40)** | `docs/test-results/11a-counter-app-events-files.md`; roadmap below |
-| 12 TC/TM over UDP with a Python ground station (12a–12c, simulator) | roadmap agreed 2026-11-13, not started | see "Roadmap: steps 11 and 12" |
+| 12 TC/TM over UDP with a Python ground station (12a–12c, simulator) | **12a phase 1 done 2026-11-13 (D41), waiting for go-ahead on phase 2** | see "Roadmap: steps 11 and 12" |
 | SmartFusion2 target | not planned in detail yet (blocked by D7) | — |
 
 ## 04a: where it stands
@@ -215,8 +215,9 @@ plan for 11c. 11c done 2026-11-13 (D39; CDS left as future work, sch_lab only in
 exit 0 on the rerun (first run: one QEMU late/early pair); closed and committed (user approved). 11d done
 2026-11-13 (D40): 06 5/5, a 2000 ms table period rejected by the 1 s check (period comes from the timer), 08 RAM
 504,764 bytes (96 %), 09 5/5, 10 (worker 83 % stack free), 07-check-bundle exit 0; closed and committed (user
-approved). 12a plan presented 2026-11-13, **not yet approved** (user: continue later). Next action: user
-decision on the 12a plan, then its phase 1.
+approved). 12a plan approved 2026-11-13. Phase 1 done (D41, `docs/test-results/12a-osal-sockets-sim.md`):
+a blocking host `select()` starves lower-priority tasks completely; polling with `vTaskDelay(1)` leaves them
+91–98 % at ~1 % host CPU, latency ≤ 1 ms; not committed. Next action: user go-ahead for phase 2.
 
 12a plan (OSAL sockets on the simulator; summary): (1) Phase 1, investigate and stop: a test program on the
 FreeRTOS POSIX port (`tests/freertos-posix-socket-block/`) — a high-priority task waits in a host `select()`
