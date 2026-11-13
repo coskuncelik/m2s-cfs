@@ -24,7 +24,7 @@ Last updated: 2026-11-13. Read this first when resuming. Rules: `CLAUDE.md`. Dec
 | **07b bundle: simulator + QEMU Cortex-M3 configurations, history kept (D35)** | **closed 2026-11-09 (user approved); bundle published 2026-11-09: main = `ed41597`, tags `v1-sim`, `v2-sim-qemu`** | `docs/test-results/07b-export-bundle-qemu.md` |
 | **10 memory sizing of the Cortex-M3 flight image (D36)** | **closed 2026-11-12 (user approved; option A); 07-check-bundle failure left open (pre-existing export issue)** | `docs/test-results/10-memory-sizing.md` |
 | 11 counter_app features (11a–11d, simulator) | **closed 2026-11-13 (user approved): 11a (D37), 11b (D38), 11c (D39), 11d (D40)** | `docs/test-results/11a-counter-app-events-files.md`; roadmap below |
-| 12 TC/TM over UDP with a Python ground station (12a–12c, simulator) | **12a phase 1 done 2026-11-13 (D41), waiting for go-ahead on phase 2** | see "Roadmap: steps 11 and 12" |
+| 12 TC/TM over UDP with a Python ground station (12a–12c, simulator) | **12a closed 2026-11-13 (D41, user approved); 12b–12c not started** | see "Roadmap: steps 11 and 12" |
 | SmartFusion2 target | not planned in detail yet (blocked by D7) | — |
 
 ## 04a: where it stands
@@ -217,7 +217,11 @@ exit 0 on the rerun (first run: one QEMU late/early pair); closed and committed 
 504,764 bytes (96 %), 09 5/5, 10 (worker 83 % stack free), 07-check-bundle exit 0; closed and committed (user
 approved). 12a plan approved 2026-11-13. Phase 1 done (D41, `docs/test-results/12a-osal-sockets-sim.md`):
 a blocking host `select()` starves lower-priority tasks completely; polling with `vTaskDelay(1)` leaves them
-91–98 % at ~1 % host CPU, latency ≤ 1 ms; not committed. Next action: user go-ahead for phase 2.
+91–98 % at ~1 % host CPU, latency ≤ 1 ms; committed. Phase 2 done 2026-11-13: host sockets with polling
+select in the OS layer (simulator only); 04 75/75 with network-api-test 164/164 and select-test 132/132, 06 5/5,
+05b 3/3 (`--clean`), 08/09/09b unchanged (no socket code on the Cortex-M3), 07-check-bundle exit 0; closed and
+committed (user approved). Next action: the plan for 12b. Known: an incremental build right after a CMake input
+change can fail in CMake configure ("Configuring incomplete"); `--clean` avoids it (seen in 11b and 12a).
 
 12a plan (OSAL sockets on the simulator; summary): (1) Phase 1, investigate and stop: a test program on the
 FreeRTOS POSIX port (`tests/freertos-posix-socket-block/`) — a high-priority task waits in a host `select()`

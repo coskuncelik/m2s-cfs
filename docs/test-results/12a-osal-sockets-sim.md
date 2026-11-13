@@ -45,3 +45,35 @@ It does not happen in native Linux cFS (every task is a Linux thread) nor on a F
 TCP/IP stack (a socket wait blocks on a FreeRTOS semaphore or queue).
 Phase 2 uses the planned design: OSAL's portable socket code with our own `OS_SelectSingle/Multiple_Impl` that
 polls with a zero timeout and blocks the task in FreeRTOS (`vTaskDelay`, one tick) between polls.
+
+## Phase 2: OSAL sockets on the simulator (2026-11-13)
+
+Implementation (D41): OSAL's portable `os-impl-bsd-sockets.c` and `os-impl-posix-network.c` (unchanged) plus
+`osal-ext/freertos/src/os-impl-host-sockets.c` (socket handle table, polling `OS_SelectSingle_Impl` /
+`OS_SelectMultiple_Impl`: zero-timeout host `select()`, `vTaskDelay(1)` between polls; socket stream
+read/write/close with `MSG_DONTWAIT`, `MSG_NOSIGNAL` on send, EINTR retried); headers `os-impl-io.h`,
+`os-impl-sockets.h`, `os-impl-network.h` in `osal-ext/freertos/inc`; `OS_Generic{Read,Write,Seek,Close}_Impl` in
+`os-impl-filesys.c` hand socket streams to it; stream init in `os-impl-common.c`. Compiled only with
+`OSAL_CONFIG_INCLUDE_NETWORK` and BSP `freertos-posix-sim` (`OS_FREERTOS_HOST_SOCKETS`; the network sources with
+`_XOPEN_SOURCE=600` like OSAL's generic-linux BSP); otherwise the no-network/no-sockets/no-select stubs, and
+networking on another BSP stops the build. Networking on in `config/osal/freertos-posix-sim/osal_config.cmake`
+(script 04 and the simulator cFE missions); Cortex-M3 config unchanged. `scripts/lib/osal-tests.sh`: the 5
+network entries moved to `OSAL_KNOWN_FAILS_NO_NETWORK`, used only by script 09b.
+
+| Check | Result |
+|---|---|
+| `04 --clean` (all OSAL tests on the simulator, 3 rounds): `select-test` 132/132 PASS (before: 19 assertions, 3 N/A "network not implemented"), `network-api-test` 164/164 PASS (before: 20, 5 tolerated failures D26), `osal_network_UT` 4 (3 PASS, 1 MIR host id, as on OSAL's POSIX port; before 2); no known failure left for networking | PASS 75/75 (exit 0); repeated after the `_XOPEN_SOURCE` fix: 75/75 (exit 0) |
+| `06 --clean` (simulator cFE + counter_app): first run failed to build — `gethostname`/`gethostid` implicitly declared under cFE's `-std=c99 -pedantic -Werror`; fixed with `_XOPEN_SOURCE=600` on the three network sources | FAIL (exit 2), then PASS 5/5 (exit 0) |
+| Simulator image: `OS_SocketOpen_Impl`, `OS_FreeRTOS_HostSocketRead`, host `socket`, `select` linked | as expected |
+| `05b` (cFE functional tests, simulator): first run (before the fix) failed to build as 06; an incremental rerun failed in CMake ("Configuring incomplete", two parallel make targets reconfiguring the same sub-build after a CMake input changed); `05b --clean` | PASS 3/3 (exit 0), same as native except the 1 known D29 difference |
+| `08 --clean` (Cortex-M3): RAM 504,764 bytes (unchanged); no `OS_SocketOpen_Impl`, `socket` or `select` in the image | PASS (exit 0) |
+| `09 --clean` (Cortex-M3 under QEMU) | PASS 5/5 (exit 0) |
+| `09b --clean` (OSAL tests on the Cortex-M3, networking off, the 5 network entries from `OSAL_KNOWN_FAILS_NO_NETWORK`) | PASS 75/75 (exit 0) |
+| `07-check-bundle.sh` (bundle's simulator config keeps networking off): run before and after the CMake fix | PASS (exit 0) both; published bundle unchanged (`ed41597`) |
+
+### Findings
+
+- The incremental-build CMake failure ("Configuring incomplete" with interleaved configure output) is the second
+  occurrence (first in 11b, then unexplained): it follows a change of a CMake input and goes away with
+  `--clean`. Reasoned: concurrent re-configuration of the cFE per-target sub-build by parallel make targets.
+- Polling cost under cFE is not measured yet: no cFE app waits on a socket until `ci_lab` (12b).

@@ -27,13 +27,37 @@ add_library(osal_freertos_impl OBJECT
     ${OSAL_SOURCE_DIR}/src/os/portable/os-impl-no-shell.c
     ${OSAL_SOURCE_DIR}/src/os/portable/os-impl-no-loader.c
     ${OSAL_SOURCE_DIR}/src/os/portable/os-impl-no-symtab.c
-    ${OSAL_SOURCE_DIR}/src/os/portable/os-impl-no-network.c
-    ${OSAL_SOURCE_DIR}/src/os/portable/os-impl-no-sockets.c
-    ${OSAL_SOURCE_DIR}/src/os/portable/os-impl-no-select.c
 )
 
-if (OSAL_CONFIG_INCLUDE_NETWORK OR OSAL_CONFIG_INCLUDE_DYNAMIC_LOADER)
-    message(FATAL_ERROR "OSAL freertos layer: set OSAL_CONFIG_INCLUDE_NETWORK and OSAL_CONFIG_INCLUDE_DYNAMIC_LOADER to FALSE")
+if (OSAL_CONFIG_INCLUDE_DYNAMIC_LOADER)
+    message(FATAL_ERROR "OSAL freertos layer: set OSAL_CONFIG_INCLUDE_DYNAMIC_LOADER to FALSE")
+endif()
+# Networking (step 12a, D41): host sockets on the Linux simulator only — OSAL's portable BSD socket and POSIX
+# network code plus os-impl-host-sockets.c (polling select, socket streams). Every other target keeps the stubs.
+if (OSAL_CONFIG_INCLUDE_NETWORK)
+    if (NOT OSAL_SYSTEM_BSPTYPE STREQUAL "freertos-posix-sim")
+        message(FATAL_ERROR "OSAL freertos layer: networking is only available with the freertos-posix-sim BSP (host sockets)")
+    endif()
+    target_sources(osal_freertos_impl PRIVATE
+        src/os-impl-host-sockets.c
+        ${OSAL_SOURCE_DIR}/src/os/portable/os-impl-bsd-sockets.c
+        ${OSAL_SOURCE_DIR}/src/os/portable/os-impl-posix-network.c
+    )
+    target_compile_definitions(osal_freertos_impl PRIVATE OS_FREERTOS_HOST_SOCKETS)
+    # Host network API (gethostname, gethostid ...) also under the strict -std=c99 of cFE builds: the X/Open 6
+    # level that OSAL's own generic-linux BSP uses.
+    set_source_files_properties(
+        src/os-impl-host-sockets.c
+        ${OSAL_SOURCE_DIR}/src/os/portable/os-impl-bsd-sockets.c
+        ${OSAL_SOURCE_DIR}/src/os/portable/os-impl-posix-network.c
+        PROPERTIES COMPILE_DEFINITIONS _XOPEN_SOURCE=600)
+    set_source_files_properties(src/os-impl-host-sockets.c PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra;-Werror")
+else()
+    target_sources(osal_freertos_impl PRIVATE
+        ${OSAL_SOURCE_DIR}/src/os/portable/os-impl-no-network.c
+        ${OSAL_SOURCE_DIR}/src/os/portable/os-impl-no-sockets.c
+        ${OSAL_SOURCE_DIR}/src/os/portable/os-impl-no-select.c
+    )
 endif()
 
 target_include_directories(osal_freertos_impl PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/inc)

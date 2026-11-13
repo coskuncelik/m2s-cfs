@@ -47,7 +47,7 @@ NM="arm-none-eabi-nm"
 # shellcheck source=lib/osal-tests.sh
 source "${SCRIPT_DIR}/lib/osal-tests.sh"
 TESTS=("${OSAL_TESTS[@]}")
-KNOWN_FAILS=("${OSAL_KNOWN_FAILS_CONFIG[@]}")   # D26 only: no D22 entry on the Cortex-M3
+KNOWN_FAILS=("${OSAL_KNOWN_FAILS_CONFIG[@]}" "${OSAL_KNOWN_FAILS_NO_NETWORK[@]}")   # D26 (networking off on the Cortex-M3, D41); no D22 entry
 
 # Lines that fail a run whatever its exit status (boards/common-cm3/m2s_cm3_diag.h).
 M2S_ERROR_RE='^M2S (TRAP|FAULT|ASSERT|PANIC|STOP)'

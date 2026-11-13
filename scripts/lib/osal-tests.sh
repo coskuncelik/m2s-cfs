@@ -20,15 +20,19 @@ OSAL_TESTS=(
 # Allowed assertions on every target, as "<test name>|<text that identifies one FAIL/TSF/TTF line>". A run
 # passes only if its failed assertions are exactly the entries listed for that test (same count, each one
 # matched), so a new failure or a missing expected one is still an error.
-#   D26: features left out by configuration (osal_config.cmake): the network (network-api-test checks
-#        socket address functions without allowing "not implemented") and loading modules from
-#        files (osal_loader_UT loads /utmod/MODULE*.so; the dynamic loader is off).
-OSAL_KNOWN_FAILS_CONFIG=(
+#   D26: features left out by configuration (osal_config.cmake): loading modules from files
+#        (osal_loader_UT loads /utmod/MODULE*.so; the dynamic loader is off).
+#   The 5 network-api-test entries of D26 are gone: networking is on in the simulator (host sockets,
+#   step 12a, D41). Callers whose configuration has networking off (Cortex-M3, script 09b) add them back
+#   with OSAL_KNOWN_FAILS_NO_NETWORK.
+OSAL_KNOWN_FAILS_NO_NETWORK=(
     "network-api-test|network-api-test.c:99 - OS_SocketAddrSetPort(&addr, 0xFFFF) (-28)"
     "network-api-test|network-api-test.c:103 - OS_SocketAddrGetPort(&port, &addr) (-28)"
     "network-api-test|network-api-test.c:108 - OS_SocketAddrInit(&addr, OS_SocketDomain_INET) (-28)"
     "network-api-test|network-api-test.c:113 - OS_SocketAddrFromString(&addr, \"invalid\") (-28)"
     "network-api-test|network-api-test.c:119 - OS_SocketAddrToString(addr_string, 1, &addr) (-28)"
+)
+OSAL_KNOWN_FAILS_CONFIG=(
     "osal_loader_UT|ut_osloader_module_test.c:128 - OS_ModuleLoad(&module_id, module_name, module_file_name, OS_MODULE_FLAG_LOCAL_SYMBOLS) (-28)"
     "osal_loader_UT|ut_osloader_module_test.c:141 - OS_ModuleLoad(&module_id2, \"DUPLICATE\", UT_OS_GENERIC_MODULE_NAME2, OS_MODULE_FLAG_LOCAL_SYMBOLS) (-28)"
     "osal_loader_UT|ut_osloader_module_test.c:156 - OS_ModuleLoad(&module_id, \"Good\", UT_OS_GENERIC_MODULE_NAME2, OS_MODULE_FLAG_LOCAL_SYMBOLS) (-28)"

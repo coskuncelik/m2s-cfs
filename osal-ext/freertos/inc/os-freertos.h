@@ -150,6 +150,16 @@ int32 OS_FreeRTOS_BinSemAPI_Impl_Init(void);
 int32 OS_FreeRTOS_CountSemAPI_Impl_Init(void);
 int32 OS_FreeRTOS_MutexAPI_Impl_Init(void);
 int32 OS_FreeRTOS_FileSysAPI_Impl_Init(void);
+
+#ifdef OS_FREERTOS_HOST_SOCKETS
+/* Host sockets of the Linux simulator (os-impl-host-sockets.c, step 12a, D41). */
+int32 OS_FreeRTOS_HostSocketsInit(void);
+bool  OS_FreeRTOS_IsHostSocket(const OS_object_token_t *token);
+int32 OS_FreeRTOS_HostSocketRead(const OS_object_token_t *token, void *buffer, size_t nbytes, OS_time_t abs_timeout);
+int32 OS_FreeRTOS_HostSocketWrite(const OS_object_token_t *token, const void *buffer, size_t nbytes,
+                                  OS_time_t abs_timeout);
+int32 OS_FreeRTOS_HostSocketClose(const OS_object_token_t *token);
+#endif
 int32 OS_FreeRTOS_TimeBaseAPI_Impl_Init(void);
 
 #endif /* OS_FREERTOS_H */

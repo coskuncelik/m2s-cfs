@@ -550,6 +550,12 @@ int32 OS_GenericSeek_Impl(const OS_object_token_t *token, int32 offset, uint32 w
     int64                     target;
     int32                     return_code = OS_ERROR;
 
+#ifdef OS_FREERTOS_HOST_SOCKETS
+    if (OS_FreeRTOS_IsHostSocket(token))
+    {
+        return OS_ERR_OPERATION_NOT_SUPPORTED; /* sockets have no position */
+    }
+#endif
     OS_FreeRTOS_RamFsLock();
     if (h->in_use && RamFS_GetInfo(OS_FreeRTOS_RamVols[h->vol].fs, h->node, &info) == RAMFS_OK)
     {
@@ -584,6 +590,12 @@ int32 OS_GenericRead_Impl(const OS_object_token_t *token, void *buffer, size_t n
     OS_FreeRTOS_FileHandle_t *h = OS_OBJECT_TABLE_GET(OS_FreeRTOS_FileHandles, *token);
     int32                     rc;
 
+#ifdef OS_FREERTOS_HOST_SOCKETS
+    if (OS_FreeRTOS_IsHostSocket(token))
+    {
+        return OS_FreeRTOS_HostSocketRead(token, buffer, nbytes, abs_timeout);
+    }
+#endif
     (void)abs_timeout; /* a RAM file never blocks */
     if (nbytes > (size_t)INT32_MAX)
     {
@@ -617,6 +629,12 @@ int32 OS_GenericWrite_Impl(const OS_object_token_t *token, const void *buffer, s
     RamFS_t *                 fs;
     int32                     rc;
 
+#ifdef OS_FREERTOS_HOST_SOCKETS
+    if (OS_FreeRTOS_IsHostSocket(token))
+    {
+        return OS_FreeRTOS_HostSocketWrite(token, buffer, nbytes, abs_timeout);
+    }
+#endif
     (void)abs_timeout;
     if (nbytes > (size_t)INT32_MAX)
     {
@@ -653,6 +671,12 @@ int32 OS_GenericClose_Impl(const OS_object_token_t *token)
 {
     OS_FreeRTOS_FileHandle_t *h = OS_OBJECT_TABLE_GET(OS_FreeRTOS_FileHandles, *token);
 
+#ifdef OS_FREERTOS_HOST_SOCKETS
+    if (OS_FreeRTOS_IsHostSocket(token))
+    {
+        return OS_FreeRTOS_HostSocketClose(token);
+    }
+#endif
     OS_FreeRTOS_RamFsLock();
     h->in_use = false;
     OS_FreeRTOS_RamFsUnlock();

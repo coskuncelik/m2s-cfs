@@ -43,6 +43,11 @@ int32 OS_API_Impl_Init(osal_objtype_t idtype)
         case OS_OBJECT_TYPE_OS_FILESYS:
             return_code = OS_FreeRTOS_FileSysAPI_Impl_Init();
             break;
+#ifdef OS_FREERTOS_HOST_SOCKETS
+        case OS_OBJECT_TYPE_OS_STREAM:
+            return_code = OS_FreeRTOS_HostSocketsInit();
+            break;
+#endif
         default:
             break;
     }

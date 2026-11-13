@@ -6,7 +6,7 @@
 ##########################################################################
 
 # Not implemented by the FreeRTOS layer (OSAL's portable "no-*" stubs are used).
-set(OSAL_CONFIG_INCLUDE_NETWORK         FALSE)
+set(OSAL_CONFIG_INCLUDE_NETWORK         TRUE)   # host sockets (step 12a, D41)
 set(OSAL_CONFIG_INCLUDE_DYNAMIC_LOADER  FALSE)
 set(OSAL_CONFIG_INCLUDE_STATIC_LOADER   TRUE)
 
