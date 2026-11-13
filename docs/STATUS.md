@@ -215,7 +215,23 @@ plan for 11c. 11c done 2026-11-13 (D39; CDS left as future work, sch_lab only in
 exit 0 on the rerun (first run: one QEMU late/early pair); closed and committed (user approved). 11d done
 2026-11-13 (D40): 06 5/5, a 2000 ms table period rejected by the 1 s check (period comes from the timer), 08 RAM
 504,764 bytes (96 %), 09 5/5, 10 (worker 83 % stack free), 07-check-bundle exit 0; closed and committed (user
-approved). Next action: the plan for 12a.
+approved). 12a plan presented 2026-11-13, **not yet approved** (user: continue later). Next action: user
+decision on the 12a plan, then its phase 1.
+
+12a plan (OSAL sockets on the simulator; summary): (1) Phase 1, investigate and stop: a test program on the
+FreeRTOS POSIX port (`tests/freertos-posix-socket-block/`) — a high-priority task waits in a host `select()`
+while a low-priority task counts; measure starvation, EINTR and timeouts, and the alternative (zero-timeout
+`select()` + `vTaskDelay(1)` polling). Reasoned, not yet tested: a task in a blocking host call still counts as
+running for FreeRTOS, so lower-priority tasks would not run. (2) Phase 2, expected design: reuse OSAL's portable
+`os-impl-bsd-sockets.c` and `os-impl-posix-network.c` unchanged; our own `OS_SelectSingle/Multiple_Impl` that
+polls and blocks with `vTaskDelay`; stream records typed RAM file or socket, `OS_Generic*_Impl` dispatching
+sockets to host `read`/`write`/`close`; `os-impl-sockets.h`/`os-impl-io.h` in `osal-ext/freertos/inc`; compiled
+only for networking on and BSP `freertos-posix-sim` (Cortex-M3 keeps the stubs); networking on in
+`config/osal/freertos-posix-sim/osal_config.cmake` (shared by script 04 and the simulator cFE mission); the 5
+network entries removed from script 04's `KNOWN_FAILS` (D26 updated). Risks: polling cost (~1000 host selects/s
+per waiting socket), SIGPIPE on TCP send, RAM file system I/O through the new dispatch, bundle export (its
+simulator config keeps networking off). (3) Verify: 04 exit 0 with no network known failures, 06, 05b,
+08/09/09b unchanged (no socket symbols on the Cortex-M3), 07-check-bundle; D41, test results, ARCHITECTURE.
 
 Future work (user decisions 2026-11-13): (1) counter_app CDS kept across a processor reset — needs PSP
 processor-reset support (simulator: file-backed reserved memory and re-exec; board: no-init RAM) and a restart
