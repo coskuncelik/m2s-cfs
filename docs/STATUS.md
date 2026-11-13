@@ -23,7 +23,7 @@ Last updated: 2026-11-13. Read this first when resuming. Rules: `CLAUDE.md`. Dec
 | **09c cFE functional tests on the emulated Cortex-M3, QEMU (D34)** | **closed 2026-11-07 (user approved)** | `docs/test-results/09c-cfe-functional-tests-arm-cm3-qemu.md` |
 | **07b bundle: simulator + QEMU Cortex-M3 configurations, history kept (D35)** | **closed 2026-11-09 (user approved); bundle published 2026-11-09: main = `ed41597`, tags `v1-sim`, `v2-sim-qemu`** | `docs/test-results/07b-export-bundle-qemu.md` |
 | **10 memory sizing of the Cortex-M3 flight image (D36)** | **closed 2026-11-12 (user approved; option A); 07-check-bundle failure left open (pre-existing export issue)** | `docs/test-results/10-memory-sizing.md` |
-| 11 counter_app features (11a–11d, simulator) | roadmap agreed 2026-11-13, not started | see "Roadmap: steps 11 and 12" |
+| 11 counter_app features (11a–11d, simulator) | **11a events and file I/O closed 2026-11-13 (D37, user approved); 11b–11d not started** | `docs/test-results/11a-counter-app-events-files.md`; roadmap below |
 | 12 TC/TM over UDP with a Python ground station (12a–12c, simulator) | roadmap agreed 2026-11-13, not started | see "Roadmap: steps 11 and 12" |
 | SmartFusion2 target | not planned in detail yet (blocked by D7) | — |
 
@@ -206,7 +206,8 @@ now makes one local, untagged bundle commit (PORTING.md revision line only), not
 ## Roadmap: steps 11 and 12 (agreed with the user 2026-11-13, nothing implemented)
 
 Each sub-step still gets its own detailed plan (objective, files, risks, success criteria) and user approval
-before implementation. Next action: present the plan for 11a.
+before implementation. 11a done 2026-11-13 (D37): 06 5/5, failure path detected, 08 RAM 501,940 bytes (95 %);
+closed and committed (user approved). Next action: the plan for 11b.
 
 User decisions: order 11a → 11b → 11c → 11d → 12a → 12b → 12c; **no floating point** (the user will raise it
 if needed); **no QEMU runs** in these steps (features tested on the Linux simulator; script 08 still checks the

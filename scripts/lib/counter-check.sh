@@ -10,6 +10,11 @@
 EXPECTED_LINES=(
     "CFE_ES_ParseFileEntry: Loading file: /cf/counter_app.so, APP: COUNTER_APP"
     "CFE_ES_Main: CFE_ES_Main entering OPERATIONAL state"
+    # counter_app events (EVS port 1 console format ".../<app> <event id>: ...") and file test (step 11a, D37).
+    "/COUNTER_APP 1: counter_app initialized"
+    "/COUNTER_APP 4: Read /cf/cfe_es_startup.scr: "
+    "/COUNTER_APP 2: File test passed on /ram/counter: "
+    "counter_app file test: PASS"
 )
 # None of these may appear in a run (extended regex, case-insensitive). "M2S ..." lines are the Cortex-M3
 # trap, assert, fault, panic and stop messages (boards/common-cm3/m2s_cm3_diag.h).
