@@ -79,6 +79,7 @@ git -C build/export/cfs-m2s-freertos rev-parse HEAD
 |---|---|---|---|
 | 2026-11-05 | `d48850f` | `v1-sim` | Linux simulator (`sample_defs`), counter_app |
 | 2026-11-09 | `ed41597` | `v2-sim-qemu` | configurations `freertos_sim` and `freertos_qemu` (Cortex-M3 on QEMU) |
+| 2026-11-13 | `0bf16e7` | `v3-tctm-sim` | commands and telemetry over UDP on the simulator (`sch_lab`, `ci_lab`, `to_lab`, networking), ground station, counter_app features, build-time `/cf` image with tables |
 
 ## For the team
 

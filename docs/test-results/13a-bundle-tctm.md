@@ -39,3 +39,13 @@
 | `make` with no change: `cf.tar` and the embedded `.inc` keep their times; `core-cpu1` is relinked anyway because stock cFE regenerates `cfe_build_env_table.c` (build time) on every make | as stock cFE |
 | Project scripts: `06` 5/5, `12c` exit 0 (bytes equal to cmdUtil, all checks) | PASS |
 | Published bundle unchanged (`ed41597`) | PASS |
+
+## 13b: publication (2026-11-13)
+
+Re-exported after committing 13a (PORTING.md: source revision `f2a45d4`, not dirty): bundle commit `0bf16e7` on
+the published `ed41597`, 30 files, tag `v3-tctm-sim`; `07-check-bundle.sh` on this export exit 0 (same tree twice,
+3149 upstream files identical, no private references, both configurations built in a fresh clone, `/cf` with both
+tables, simulator 5/5, TC/TM with the bundle's ground station, QEMU 5/5). Pushed by the user (normal push,
+fine-grained token). `git ls-remote https://github.com/coskuncelik/cfs-m2s-freertos.git`: `refs/heads/main` and
+`refs/tags/v3-tctm-sim` = `0bf16e7e7264bc549eff0c94cc937a4005f3a0be` (= local HEAD and tag), `v1-sim` = `d48850f`,
+`v2-sim-qemu` = `ed41597`.

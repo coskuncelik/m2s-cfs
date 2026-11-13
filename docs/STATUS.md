@@ -25,7 +25,7 @@ Last updated: 2026-11-13. Read this first when resuming. Rules: `CLAUDE.md`. Dec
 | **10 memory sizing of the Cortex-M3 flight image (D36)** | **closed 2026-11-12 (user approved; option A); 07-check-bundle failure left open (pre-existing export issue)** | `docs/test-results/10-memory-sizing.md` |
 | 11 counter_app features (11a–11d, simulator) | **closed 2026-11-13 (user approved): 11a (D37), 11b (D38), 11c (D39), 11d (D40)** | `docs/test-results/11a-counter-app-events-files.md`; roadmap below |
 | 12 TC/TM over UDP with a Python ground station (12a–12c, simulator) | **closed 2026-11-13 (user approved): 12a (D41), 12b (D42), 12c (D43)** | see "Roadmap: steps 11 and 12" |
-| **13 bundle v3: commands and telemetry (13a), publish `v3-tctm-sim` (13b)** | **13a closed 2026-11-13 (D44, user approved); 13b in preparation** | `docs/test-results/13a-bundle-tctm.md` |
+| **13 bundle v3: commands and telemetry (13a), publish `v3-tctm-sim` (13b)** | **closed 2026-11-13: 13a (D44); 13b bundle published by the user: main = tag `v3-tctm-sim` = `0bf16e7`** | `docs/test-results/13a-bundle-tctm.md` |
 | SmartFusion2 target | not planned in detail yet (blocked by D7) | — |
 
 ## 04a: where it stands
@@ -229,8 +229,9 @@ identical to cmdUtil, all counter_app commands and error cases seen in telemetry
 06 5/5; closed and committed (user approved). Roadmap of steps 11-12 complete. Step 13 (user 2026-11-13: option
 B, tag `v3-tctm-sim`): 13a done (D44) — the bundle's simulator configuration has sch_lab/ci_lab/to_lab, networking
 and the ground station; build-time `/cf` image with tables; 07-check-bundle exit 0 (TC/TM in the clone);
-closed and committed (user approved). Next action: 13b — re-export (clean source revision), 07-check-bundle,
-then the user pushes with a token (docs/BUNDLE-PUBLISH.md). Known: an incremental build right after a CMake input
+closed and committed (user approved). 13b: re-export with the clean source revision `f2a45d4`, 07-check-bundle
+exit 0, pushed by the user 2026-11-13 (normal push, fine-grained token); `git ls-remote`: `main` = `v3-tctm-sim` =
+`0bf16e7` on `ed41597`, `v1-sim` = `d48850f`, `v2-sim-qemu` = `ed41597`. Step 13 closed. Next action: user decision. Known: an incremental build right after a CMake input
 change can fail in CMake configure ("Configuring incomplete"); `--clean` avoids it (seen in 11b and 12a).
 
 12a plan (OSAL sockets on the simulator; summary): (1) Phase 1, investigate and stop: a test program on the
