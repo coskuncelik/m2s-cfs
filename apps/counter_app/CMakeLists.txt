@@ -7,7 +7,10 @@
 ######################################################################
 project(M2S_COUNTER_APP C)
 
-add_cfe_app(counter_app fsw/src/counter_app.c)
+add_cfe_app(counter_app fsw/src/counter_app.c fsw/src/counter_app_cmds.c)
+
+# Public headers (message IDs, command and telemetry formats, table format), also used by other apps' tables.
+target_include_directories(counter_app PUBLIC fsw/inc)
 
 # Uses NASA's sample_lib: public header and link order; the mission must also list sample_lib in
 # its static app list and load it with a CFE_LIB line before counter_app in the startup script.

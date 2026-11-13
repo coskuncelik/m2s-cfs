@@ -20,6 +20,15 @@ EXPECTED_LINES=(
     "SAMPLE_LIB_Function called, buffer='SAMPLE DATA'"
     "/COUNTER_APP 5: sample_lib call returned 0x00000000"
     "counter_app sample_lib call: PASS"
+    # Parameter table loaded from memory at start-up (step 11c, D39).
+    "/COUNTER_APP 8: Table loaded: period 1000 ms, limits 500..5000 ms"
+)
+# Expected only in the project's own missions (scripts 06 and 09), which run sch_lab; the exported bundle has no
+# sch_lab yet (its /cf image cannot hold build-time table files, D39). The caller sets COUNTER_CHECK_BUNDLE=1
+# to leave them out.
+PROJECT_EXPECTED_LINES=(
+    "SCH Lab Initialized."
+    "/COUNTER_APP 7: First housekeeping packet sent"
 )
 # None of these may appear in a run (extended regex, case-insensitive). "M2S ..." lines are the Cortex-M3
 # trap, assert, fault, panic and stop messages (boards/common-cm3/m2s_cm3_diag.h).
@@ -47,7 +56,9 @@ check_run() {
     local -a stamps=() values=()
 
     (( rc == 124 )) || { echo "exit ${rc} (124 expected)"; problems=$(( problems + 1 )); }
-    for line in "${EXPECTED_LINES[@]}"; do
+    local -a expected=("${EXPECTED_LINES[@]}")
+    (( ${COUNTER_CHECK_BUNDLE:-0} )) || expected+=("${PROJECT_EXPECTED_LINES[@]}")
+    for line in "${expected[@]}"; do
         grep -qF -- "${line}" "${out}" || { echo "missing line: ${line}"; problems=$(( problems + 1 )); }
     done
     inits="$(grep -cE '^[0-9.]+ counter_app initialized$' "${out}" || true)"

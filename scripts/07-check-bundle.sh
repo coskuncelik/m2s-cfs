@@ -25,6 +25,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/cfe-sim.sh"
 # shellcheck source=lib/counter-check.sh
 source "${SCRIPT_DIR}/lib/counter-check.sh"
+# The bundle has no sch_lab yet (D39): its sch_lab and housekeeping lines are not expected.
+COUNTER_CHECK_BUNDLE=1
 cfe_sim_init freertos-posix-sim
 LOG_FILE="${LOG_DIR}/07-check-bundle.log"
 RUN_DIR="${LOG_DIR}/07-bundle-runs"

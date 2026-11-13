@@ -1,14 +1,17 @@
 /*
  * counter_app.c — m2s-cfs counter_app.
  *
- * A minimal cFE application: registers with cFE, prints "counter_app initialized", then prints an
- * incrementing counter once per second until cFE asks it to stop. Output goes through OS_printf
+ * A cFE application: registers with cFE, prints "counter_app initialized", then prints an incrementing
+ * counter once per period (1 s by default) until cFE asks it to stop. Output goes through OS_printf
  * (OSAL console -> BSP -> terminal or UART), so the same source runs on every target (D28).
  * Uses only the cFE and OSAL public APIs: no C library I/O, no platform code, no dynamic memory.
  *
- * Period: the loop waits until the next fixed 1 s deadline (OS_GetLocalTime) rather than a plain
- * OS_TaskDelay(1000). OS_TaskDelay waits at least the time asked, up to one tick more, so plain delays
+ * Period: the loop waits until the next fixed deadline (OS_GetLocalTime) rather than a plain
+ * OS_TaskDelay(period). OS_TaskDelay waits at least the time asked, up to one tick more, so plain delays
  * drift (about 1 ms per second measured on the simulator); deadlines keep the error within about a tick.
+ * Until each deadline the command pipe is read with a timeout of the remaining time, so commands and
+ * housekeeping requests are handled as they arrive (counter_app_cmds.c). The period comes from the parameter
+ * table (default 1000 ms) and can be changed by command within the table's limits.
  *
  * Events: EVS events for start-up, the file test and the library call (counter_app_events.h); EVS port 1
  * prints them on the console. The OS_printf lines stay, so the counter timing can be checked on the console.
@@ -22,11 +25,11 @@
  */
 #include <string.h>
 
-#include "cfe.h"
+#include "counter_app.h"
 #include "counter_app_events.h"
 #include "sample_lib.h"
 
-#define COUNTER_APP_PERIOD_MS 1000
+COUNTER_APP_Data_t COUNTER_APP_Data;
 
 #define COUNTER_APP_TEST_DIR      "/ram/counter"
 #define COUNTER_APP_TEST_FILE     COUNTER_APP_TEST_DIR "/test.dat"
@@ -220,73 +223,110 @@ static void COUNTER_APP_LibraryCall(void)
 {
     int32 status = SAMPLE_LIB_Function();
 
+    COUNTER_APP_Data.LibCallStatus = status;
     if (status == CFE_SUCCESS)
     {
         CFE_EVS_SendEvent(COUNTER_APP_LIB_CALL_INF_EID, CFE_EVS_EventType_INFORMATION,
-                          "sample_lib call returned 0x%08lX", (unsigned long)status);
+                          "sample_lib call returned 0x%08lX", (unsigned long)(uint32)status);
         OS_printf("counter_app sample_lib call: PASS\n");
     }
     else
     {
         CFE_EVS_SendEvent(COUNTER_APP_LIB_CALL_ERR_EID, CFE_EVS_EventType_ERROR,
-                          "sample_lib call error, status 0x%08lX", (unsigned long)status);
+                          "sample_lib call error, status 0x%08lX", (unsigned long)(uint32)status);
         OS_printf("counter_app sample_lib call: FAIL\n");
     }
 }
 
-/* Sleeps until *deadline + one period, then advances *deadline. Resynchronises if local time jumps. */
+/* Reads the command pipe until the deadline; returns when it has passed. */
+static void COUNTER_APP_ServiceUntil(OS_time_t deadline)
+{
+    CFE_SB_Buffer_t *buf;
+    OS_time_t        now;
+    int64            remaining_ms;
+    CFE_Status_t     status;
+
+    for (;;)
+    {
+        (void)OS_GetLocalTime(&now);
+        remaining_ms = OS_TimeGetTotalMilliseconds(OS_TimeSubtract(deadline, now));
+        if (remaining_ms <= 0)
+        {
+            return;
+        }
+        status = CFE_SB_ReceiveBuffer(&buf, COUNTER_APP_Data.CommandPipe, (int32)remaining_ms);
+        if (status == CFE_SUCCESS)
+        {
+            COUNTER_APP_ProcessMessage(buf);
+        }
+        else if (status != CFE_SB_TIME_OUT)
+        {
+            CFE_EVS_SendEvent(COUNTER_APP_SB_ERR_EID, CFE_EVS_EventType_ERROR,
+                              "Software Bus receive error, status 0x%08lX", (unsigned long)(uint32)status);
+            (void)OS_TaskDelay((uint32)remaining_ms);
+            return;
+        }
+    }
+}
+
+/* Waits until *deadline + one period (serving the pipe), then advances *deadline. Resynchronises if local
+ * time jumps. */
 static void COUNTER_APP_WaitNextPeriod(OS_time_t *deadline)
 {
     OS_time_t now;
     int64     remaining_ms;
+    uint32    period_ms = COUNTER_APP_Data.PeriodMs;
 
-    *deadline = OS_TimeAdd(*deadline, OS_TimeFromTotalMilliseconds(COUNTER_APP_PERIOD_MS));
+    *deadline = OS_TimeAdd(*deadline, OS_TimeFromTotalMilliseconds(period_ms));
     (void)OS_GetLocalTime(&now);
     remaining_ms = OS_TimeGetTotalMilliseconds(OS_TimeSubtract(*deadline, now));
 
-    if (remaining_ms < 0 || remaining_ms > COUNTER_APP_PERIOD_MS)
+    if (remaining_ms < 0 || remaining_ms > (int64)period_ms)
     {
         /* Late by more than a period, or local time was set: start a new schedule from now. */
-        *deadline    = OS_TimeAdd(now, OS_TimeFromTotalMilliseconds(COUNTER_APP_PERIOD_MS));
-        remaining_ms = COUNTER_APP_PERIOD_MS;
+        *deadline = OS_TimeAdd(now, OS_TimeFromTotalMilliseconds(period_ms));
     }
-    if (remaining_ms > 0)
-    {
-        (void)OS_TaskDelay((uint32)remaining_ms);
-    }
+    COUNTER_APP_ServiceUntil(*deadline);
 }
 
 void COUNTER_APP_Main(void)
 {
-    uint32       run_status = CFE_ES_RunStatus_APP_RUN;
-    uint32       counter    = 0;
     CFE_Status_t status;
     OS_time_t    deadline;
+
+    memset(&COUNTER_APP_Data, 0, sizeof(COUNTER_APP_Data));
+    COUNTER_APP_Data.RunStatus = CFE_ES_RunStatus_APP_RUN;
 
     /* Register with Event Services (no event filters). */
     status = CFE_EVS_Register(NULL, 0, CFE_EVS_EventFilter_BINARY);
     if (status != CFE_SUCCESS)
     {
-        OS_printf("counter_app: CFE_EVS_Register failed, status 0x%08lX\n", (unsigned long)status);
-        run_status = CFE_ES_RunStatus_APP_ERROR;
+        OS_printf("counter_app: CFE_EVS_Register failed, status 0x%08lX\n", (unsigned long)(uint32)status);
+        COUNTER_APP_Data.RunStatus = CFE_ES_RunStatus_APP_ERROR;
     }
     else
     {
         OS_printf("counter_app initialized\n");
         CFE_EVS_SendEvent(COUNTER_APP_INIT_INF_EID, CFE_EVS_EventType_INFORMATION, "counter_app initialized");
+        /* Pipe, subscriptions and parameter table are needed for the loop: their failure stops the app. */
+        if (COUNTER_APP_InitBusAndTable() != CFE_SUCCESS)
+        {
+            COUNTER_APP_Data.RunStatus = CFE_ES_RunStatus_APP_ERROR;
+        }
         /* A failed step is reported (error event, "file test: FAIL" line); the counter runs on regardless. */
-        (void)COUNTER_APP_FileTest();
+        COUNTER_APP_Data.FileTestFailedStep = (uint8)COUNTER_APP_FileTest();
         COUNTER_APP_LibraryCall();
     }
 
     (void)OS_GetLocalTime(&deadline);
 
-    while (CFE_ES_RunLoop(&run_status))
+    while (CFE_ES_RunLoop(&COUNTER_APP_Data.RunStatus))
     {
         COUNTER_APP_WaitNextPeriod(&deadline);
-        ++counter;
-        OS_printf("counter_app counter: %lu\n", (unsigned long)counter);
+        COUNTER_APP_ManageTable();
+        ++COUNTER_APP_Data.Counter;
+        OS_printf("counter_app counter: %lu\n", (unsigned long)COUNTER_APP_Data.Counter);
     }
 
-    CFE_ES_ExitApp(run_status);
+    CFE_ES_ExitApp(COUNTER_APP_Data.RunStatus);
 }

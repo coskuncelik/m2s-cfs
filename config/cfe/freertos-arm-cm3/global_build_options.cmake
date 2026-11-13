@@ -6,3 +6,6 @@ include("${CMAKE_CURRENT_LIST_DIR}/m2s_paths.cmake")
 foreach(m2s_module es sb tbl time)
     include_directories("${M2S_ROOT_DIR}/sources/cFS/cfe/modules/${m2s_module}/config")
 endforeach()
+# counter_app's public headers (message IDs) for other apps' tables, e.g. the sch_lab table override in
+# tables/sch_lab_table.c (step 11c, D39).
+include_directories("${M2S_ROOT_DIR}/apps/counter_app/fsw/inc")

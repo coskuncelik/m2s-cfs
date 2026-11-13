@@ -1,3 +1,4 @@
 # m2s-cfs: files added to the embedded /cf image (cf.tar) besides cfe_es_startup.scr, one per line:
 #   <name in /cf> <source: path relative to the cFE install directory exe/cpu1, from a first build pass>
-# None for the Cortex-M3 mission. Used by scripts/lib/cfe-sim.sh.
+# Used by scripts/lib/cfe-sim.sh. sch_lab loads its schedule table from this file (step 11c, D39).
+sch_lab_table.tbl cf/sch_lab_table.tbl

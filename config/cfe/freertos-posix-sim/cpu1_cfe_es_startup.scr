@@ -1,5 +1,6 @@
 CFE_LIB, sample_lib,  SAMPLE_LIB_Init,  SAMPLE_LIB,  0,  0,     0x0, 0;
 CFE_APP, counter_app, COUNTER_APP_Main, COUNTER_APP, 50, 16384, 0x0, 0;
+CFE_APP, sch_lab,     SCH_LAB_AppMain,  SCH_LAB_APP, 80, 16384, 0x0, 0;
 !
 ! m2s-cfs cFE startup script for cpu1.
 ! Packed into the embedded /cf image (cf.tar) and unpacked to /cf/cfe_es_startup.scr by the PSP (D5, D29).

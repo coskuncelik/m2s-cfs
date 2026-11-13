@@ -97,9 +97,15 @@ cfe_sim_assemble_defs() {
     tar --format=ustar --sort=name --owner=0 --group=0 --numeric-owner --mtime=@0 \
         -C "${cfdir}" -cf "${stage}/cf.tar" .
 
-    for f in "${stage}"/*; do
-        cfe_sim_update_file "${f}" "${MISSION_DEFS}/${f##*/}"
-    done
+    # Files, and files in sub-folders (e.g. tables/ with table source overrides), updated only if changed.
+    while IFS= read -r -d '' f; do
+        mkdir -p "$(dirname "${MISSION_DEFS}/${f#"${stage}/"}")"
+        cfe_sim_update_file "${f}" "${MISSION_DEFS}/${f#"${stage}/"}"
+    done < <(find "${stage}" -type f -print0)
+    # Files in sub-folders that the configuration no longer has.
+    while IFS= read -r -d '' f; do
+        [[ -e "${stage}/${f#"${MISSION_DEFS}/"}" ]] || rm -f "${f}"
+    done < <(find "${MISSION_DEFS}" -mindepth 2 -type f -print0)
     for f in "${MISSION_DEFS}"/*; do
         [[ -e "${stage}/${f##*/}" ]] || rm -rf "${f}"
     done
