@@ -222,7 +222,7 @@ select in the OS layer (simulator only); 04 75/75 with network-api-test 164/164 
 05b 3/3 (`--clean`), 08/09/09b unchanged (no socket code on the Cortex-M3), 07-check-bundle exit 0; closed and
 committed (user approved). 12b done 2026-11-13 (D42): ci_lab/to_lab in the simulator mission; 12b script exit 0
 (NOOP over UDP, counter_app HK at 1/s with command counter 0 -> 1, events as telemetry, 1.8 % host CPU), 06 5/5,
-05b 3/3, 08 unchanged; not committed. Next action: user approval of 12b, then the plan for 12c. Known: an incremental build right after a CMake input
+05b 3/3, 08 unchanged; closed and committed (user approved). Next action: the plan for 12c. Known: an incremental build right after a CMake input
 change can fail in CMake configure ("Configuring incomplete"); `--clean` avoids it (seen in 11b and 12a).
 
 12a plan (OSAL sockets on the simulator; summary): (1) Phase 1, investigate and stop: a test program on the
